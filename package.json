@@ -1,0 +1,36 @@
+{
+  "name": "ai-product-launch-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Product Launch OS MVP scaffold for TikTok, Amazon, and Walmart sellers.",
+  "type": "module",
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "node server/index.js",
+    "health": "node scripts/check-health.js",
+    "ai:verify": "node scripts/verify-openai.js",
+    "smoke:sprint1": "node scripts/sprint1-smoke-test.js",
+    "smoke:sprint2": "node scripts/sprint2-smoke-test.js",
+    "smoke:sprint3": "node scripts/sprint3-smoke-test.js",
+    "smoke:sprint4": "node scripts/sprint4-smoke-test.js",
+    "smoke:sprint5": "node scripts/sprint5-smoke-test.js",
+    "smoke:sprint6": "node scripts/sprint6-smoke-test.js",
+    "smoke:sprint7": "node scripts/sprint7-smoke-test.js",
+    "smoke:sprint8": "node scripts/sprint8-smoke-test.js",
+    "smoke:sprint9": "node scripts/sprint9-smoke-test.js",
+    "smoke:sprint10": "node scripts/sprint10-smoke-test.js",
+    "smoke:sprint11": "node scripts/sprint11-smoke-test.js",
+    "smoke:sprint12": "node scripts/sprint12-smoke-test.js",
+    "smoke:sprint13": "node scripts/sprint13-smoke-test.js",
+    "smoke:sprint14": "node scripts/sprint14-smoke-test.js",
+    "smoke:sprint15": "node scripts/sprint15-smoke-test.js",
+    "smoke:sprint16": "node scripts/sprint16-smoke-test.js",
+    "smoke:sprint17": "node scripts/sprint17-smoke-test.js",
+    "smoke:sprint18": "node scripts/sprint18-smoke-test.js",
+    "smoke:sprint19": "node scripts/sprint19-smoke-test.js",
+    "smoke:sprint20": "node scripts/sprint20-smoke-test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
