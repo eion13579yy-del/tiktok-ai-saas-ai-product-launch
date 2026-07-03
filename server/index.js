@@ -807,6 +807,32 @@ async function handleGetProductProject(req, res, projectId) {
   });
 }
 
+function formatAiGenerationError(error) {
+  const message = String(error?.message || "");
+
+  if (message === "OPENAI_API_KEY is not configured.") {
+    return "OPENAI_API_KEY 未配置，无法调用真实大模型。请在项目 .env 中配置 OPENAI_API_KEY。";
+  }
+
+  if (message.includes("insufficient_quota")) {
+    return "OpenAI API 已接通，但当前账号额度不足或账单不可用。请在 OpenAI 平台检查充值、账单和项目额度。";
+  }
+
+  if (message.includes("429") || message.includes("Too Many Requests")) {
+    return "OpenAI API 已接通，但当前账号触发额度或频率限制。请检查 OpenAI 账单、项目额度和速率限制后重试。";
+  }
+
+  if (message.includes("invalid_api_key")) {
+    return "OpenAI API Key 无效。请检查 .env 中的 OPENAI_API_KEY 是否正确。";
+  }
+
+  if (message.includes("model_not_found")) {
+    return "当前 OpenAI 模型不可用。请检查 .env 中的 OPENAI_MODEL 配置。";
+  }
+
+  return message;
+}
+
 async function handleGenerateLaunchReport(req, res, projectId) {
   const context = await requireSession(req, res);
 
@@ -835,9 +861,7 @@ async function handleGenerateLaunchReport(req, res, projectId) {
   } catch (error) {
     sendJson(res, 503, {
       error: "AI Generation Error",
-      message: error.message === "OPENAI_API_KEY is not configured."
-        ? "OPENAI_API_KEY 未配置，无法调用真实大模型。请在项目 .env 中配置 OPENAI_API_KEY，或仅在开发验证时显式使用 local 模式。"
-        : error.message
+      message: formatAiGenerationError(error)
     });
     return;
   }

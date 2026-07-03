@@ -41,6 +41,7 @@ async function request(path, options = {}) {
 }
 
 const engineSource = await readFile("src/ai-engine/index.js", "utf8");
+const openAiClientSource = await readFile("src/ai-engine/openai-client.js", "utf8");
 const serverAiSource = await readFile("server/ai.js", "utf8");
 
 for (const token of [
@@ -60,12 +61,12 @@ for (const token of [
   "Risk Score",
   "Overall Score",
   "dataSource",
-  "modelReasoning",
-  "https://api.openai.com/v1/responses"
+  "modelReasoning"
 ]) {
   assert(engineSource.includes(token), `AI Engine should include ${token}.`);
 }
 
+assert(openAiClientSource.includes("https://api.openai.com/v1/responses"), "OpenAI client should call Responses API.");
 assert(serverAiSource.includes("../src/ai-engine/index.js"), "server/ai.js should delegate to /src/ai-engine.");
 assert(!serverAiSource.includes("return buildLocalAiReport(project);"), "Report generation should not return local fallback.");
 

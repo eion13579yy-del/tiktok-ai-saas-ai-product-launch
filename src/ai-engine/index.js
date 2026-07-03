@@ -1,4 +1,5 @@
 import { openAiConfigStatus } from "../../server/env.js";
+import { parseOpenAiOutputJson, requestOpenAiResponses } from "./openai-client.js";
 
 const AI_ENGINE_SECTION_SCHEMA = {
   type: "object",
@@ -139,10 +140,6 @@ function requireOpenAiConfig() {
   }
 
   return config;
-}
-
-function extractOutputText(payload) {
-  return payload.output_text || payload.output?.flatMap((item) => item.content || []).find((item) => item.text)?.text;
 }
 
 function clampScore(value) {
@@ -297,34 +294,19 @@ Demand Score, Competition Score, Virality Score, Margin Score, Risk Score, Overa
 
 export async function generateAiEngineReport(project) {
   const config = requireOpenAiConfig();
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: config.model,
-      input: buildPrompt(project),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "ai_intelligence_engine_report",
-          strict: true,
-          schema: AI_ENGINE_REPORT_SCHEMA
-        }
+  const payload = await requestOpenAiResponses({
+    model: config.model,
+    input: buildPrompt(project),
+    text: {
+      format: {
+        type: "json_schema",
+        name: "ai_intelligence_engine_report",
+        strict: true,
+        schema: AI_ENGINE_REPORT_SCHEMA
       }
-    })
+    }
   });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`OpenAI request failed: ${message}`);
-  }
-
-  const payload = await response.json();
-  const outputText = extractOutputText(payload);
-  const parsed = JSON.parse(outputText);
+  const parsed = parseOpenAiOutputJson(payload);
 
   return normalizeAiEngineReport(parsed, project, config.model);
 }
