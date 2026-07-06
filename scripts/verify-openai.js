@@ -1,4 +1,5 @@
 import { openAiConfigStatus } from "../server/env.js";
+import { parseOpenAiOutputJson, requestOpenAiResponses } from "../src/ai-engine/openai-client.js";
 
 const config = openAiConfigStatus();
 
@@ -10,35 +11,25 @@ if (!config.configured) {
   print({
     ok: false,
     configured: false,
-    message: "OPENAI_API_KEY is not configured. Add it to .env or the process environment.",
+    provider: config.provider,
+    model: config.model,
+    message: `${config.provider === "deepseek" ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY"} is not configured. Add it to .env or the process environment.`,
     envFileLoaded: config.envFileLoaded,
     envFilePath: config.envFilePath
   });
 
-  if (process.env.REQUIRE_OPENAI === "1") {
+  if (process.env.REQUIRE_AI === "1" || process.env.REQUIRE_OPENAI === "1") {
     process.exit(1);
   }
 
   process.exit(0);
 }
 
-const timeoutMs = 60_000;
-const controller = new AbortController();
-const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-let response;
-
 try {
-  response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    signal: controller.signal,
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
+  const payload = await requestOpenAiResponses(
+    {
       model: config.model,
-      input: "Return a short JSON health check for AI Product Launch OS.",
+      input: "Return a short JSON health check for AI Product Launch OS. Return JSON only.",
       text: {
         format: {
           type: "json_schema",
@@ -55,43 +46,29 @@ try {
           }
         }
       }
-    })
+    },
+    { timeoutMs: 120_000 }
+  );
+
+  print({
+    ok: true,
+    configured: true,
+    provider: config.provider,
+    model: config.model,
+    responseId: payload.id,
+    output: parseOpenAiOutputJson(payload)
   });
 } catch (error) {
   print({
     ok: false,
     configured: true,
+    provider: config.provider,
     model: config.model,
-    timeoutMs,
-    message: "OpenAI API request failed. Check network connectivity, proxy settings, or firewall rules.",
+    timeoutMs: 120_000,
+    message: "AI provider request failed. Check network connectivity, proxy settings, firewall rules, API key permissions, quota, or rate limits.",
     errorName: error.name,
     errorCode: error.cause?.code,
     errorMessage: error.cause?.message || error.message
   });
   process.exit(1);
-} finally {
-  clearTimeout(timeout);
 }
-
-if (!response.ok) {
-  const body = await response.text();
-  print({
-    ok: false,
-    configured: true,
-    model: config.model,
-    status: response.status,
-    message: body
-  });
-  process.exit(1);
-}
-
-const payload = await response.json();
-const outputText = payload.output_text || payload.output?.flatMap((item) => item.content || []).find((item) => item.text)?.text;
-
-print({
-  ok: true,
-  configured: true,
-  model: config.model,
-  responseId: payload.id,
-  output: outputText ? JSON.parse(outputText) : null
-});
