@@ -822,6 +822,10 @@ function formatAiGenerationError(error) {
     return "大模型 API 已接通，但当前账号额度不足或账单不可用。请在对应平台检查充值、账单和项目额度。";
   }
 
+  if (message.includes("402") || message.includes("需要付款") || message.includes("Payment Required")) {
+    return "大模型 API 已接通，但当前账号余额不足或计费未开通。请在对应平台完成充值或开通计费后重试。";
+  }
+
   if (message.includes("429") || message.includes("Too Many Requests")) {
     return "大模型 API 已接通，但当前账号触发额度或频率限制。请检查平台账单、项目额度和速率限制后重试。";
   }
