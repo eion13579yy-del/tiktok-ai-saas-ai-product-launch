@@ -1,6 +1,6 @@
 import http from "node:http";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,18 @@ const port = Number(process.env.PORT || 3000);
 const dataFile = path.resolve(rootDir, process.env.DATA_FILE || "data/db.json");
 const sessionCookieName = "aplo_session";
 let dbWriteQueue = Promise.resolve();
+
+const emptyDb = {
+  meta: {
+    schemaVersion: 1
+  },
+  users: [],
+  workspaces: [],
+  workspaceMembers: [],
+  sessions: [],
+  productProjects: [],
+  launchReports: []
+};
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -139,6 +151,7 @@ function sendValidationError(res, message) {
 }
 
 async function readDb() {
+  await ensureDbFile();
   const raw = await readFile(dataFile, "utf8");
   const db = JSON.parse(raw);
 
@@ -152,10 +165,20 @@ async function readDb() {
   return db;
 }
 
+async function ensureDbFile() {
+  if (existsSync(dataFile)) {
+    return;
+  }
+
+  await mkdir(path.dirname(dataFile), { recursive: true });
+  await writeFile(dataFile, `${JSON.stringify(emptyDb, null, 2)}\n`, "utf8");
+}
+
 async function writeDb(db) {
   const payload = `${JSON.stringify(db, null, 2)}\n`;
 
   const writeOperation = dbWriteQueue.then(async () => {
+    await mkdir(path.dirname(dataFile), { recursive: true });
     const tempFile = path.join(path.dirname(dataFile), `db.${process.pid}.${Date.now()}.${randomUUID()}.tmp`);
     await writeFile(tempFile, payload, "utf8");
     await rename(tempFile, dataFile);

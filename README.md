@@ -171,3 +171,13 @@ OPENAI_MODEL=gpt-4.1-mini
 ## Current Sprint
 
 Sprint 20: AI Intelligence Engine in /src/ai-engine.
+
+## Deploy To Render
+
+1. Open Render and create a new Blueprint from this repository.
+2. Use `render.yaml` as the service configuration.
+3. Set `DEEPSEEK_API_KEY` in Render environment variables.
+4. Deploy the web service.
+5. Confirm `/api/health` returns `status: ok`.
+
+The app uses `PORT` from the hosting platform and initializes `data/db.json` automatically on first boot.

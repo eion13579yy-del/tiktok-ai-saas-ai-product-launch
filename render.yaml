@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: ai-product-launch-os
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AI_PROVIDER
+        value: deepseek
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DATA_FILE
+        value: data/db.json
