@@ -68,13 +68,24 @@ export function loadEnvFile(filePath = path.join(rootDir, ".env")) {
 export const envStatus = loadEnvFile();
 
 export function openAiConfigStatus() {
-  const apiKey = process.env.OPENAI_API_KEY || "";
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const provider = (process.env.AI_PROVIDER || "deepseek").toLowerCase();
+  const providerConfig = {
+    deepseek: {
+      apiKey: process.env.DEEPSEEK_API_KEY || "",
+      model: process.env.DEEPSEEK_MODEL || "deepseek-chat"
+    },
+    openai: {
+      apiKey: process.env.OPENAI_API_KEY || "",
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini"
+    }
+  };
+  const active = providerConfig[provider] || providerConfig.deepseek;
 
   return {
-    configured: apiKey.trim().length > 0,
-    model,
-    provider: process.env.AI_PROVIDER || "auto",
+    configured: active.apiKey.trim().length > 0,
+    model: active.model,
+    provider: providerConfig[provider] ? provider : "deepseek",
+    supportedProviders: Object.keys(providerConfig),
     envFileLoaded: envStatus.loaded,
     envFilePath: envStatus.path
   };

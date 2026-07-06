@@ -146,10 +146,26 @@ Sprint 20 smoke test:
 node scripts/sprint20-smoke-test.js
 ```
 
-OpenAI connectivity check:
+AI provider connectivity check:
 
 ```powershell
 npm run ai:verify
+```
+
+China-friendly default provider:
+
+```env
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+Optional OpenAI fallback:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
 ## Current Sprint

@@ -814,20 +814,24 @@ function formatAiGenerationError(error) {
     return "OPENAI_API_KEY 未配置，无法调用真实大模型。请在项目 .env 中配置 OPENAI_API_KEY。";
   }
 
+  if (message === "DEEPSEEK_API_KEY is not configured.") {
+    return "DEEPSEEK_API_KEY 未配置，无法调用 DeepSeek 大模型。请在项目 .env 中配置 DEEPSEEK_API_KEY。";
+  }
+
   if (message.includes("insufficient_quota")) {
-    return "OpenAI API 已接通，但当前账号额度不足或账单不可用。请在 OpenAI 平台检查充值、账单和项目额度。";
+    return "大模型 API 已接通，但当前账号额度不足或账单不可用。请在对应平台检查充值、账单和项目额度。";
   }
 
   if (message.includes("429") || message.includes("Too Many Requests")) {
-    return "OpenAI API 已接通，但当前账号触发额度或频率限制。请检查 OpenAI 账单、项目额度和速率限制后重试。";
+    return "大模型 API 已接通，但当前账号触发额度或频率限制。请检查平台账单、项目额度和速率限制后重试。";
   }
 
-  if (message.includes("invalid_api_key")) {
-    return "OpenAI API Key 无效。请检查 .env 中的 OPENAI_API_KEY 是否正确。";
+  if (message.includes("invalid_api_key") || message.includes("401") || message.includes("Unauthorized")) {
+    return "大模型 API Key 无效。请检查 .env 中当前供应商的 API Key 是否正确。";
   }
 
   if (message.includes("model_not_found")) {
-    return "当前 OpenAI 模型不可用。请检查 .env 中的 OPENAI_MODEL 配置。";
+    return "当前大模型不可用。请检查 .env 中当前供应商的模型配置。";
   }
 
   return message;

@@ -132,11 +132,11 @@ export const AI_ENGINE_REPORT_SCHEMA = {
   }
 };
 
-function requireOpenAiConfig() {
+function requireAiConfig() {
   const config = openAiConfigStatus();
 
   if (!config.configured) {
-    throw new Error("OPENAI_API_KEY is not configured.");
+    throw new Error(`${config.provider === "deepseek" ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY"} is not configured.`);
   }
 
   return config;
@@ -180,7 +180,7 @@ function toLegacySection(section) {
   };
 }
 
-function normalizeAiEngineReport(raw, project, model) {
+function normalizeAiEngineReport(raw, project, config) {
   const aiScore = {
     demandScore: clampScore(raw.aiScore?.demandScore),
     competitionScore: clampScore(raw.aiScore?.competitionScore),
@@ -193,8 +193,8 @@ function normalizeAiEngineReport(raw, project, model) {
 
   return {
     status: "completed",
-    generationSource: "openai",
-    model,
+    generationSource: config.provider,
+    model: config.model,
     opportunityScore: aiScore.overallScore,
     riskLevel: riskLevelFromScore(aiScore.riskScore),
     productProfile: raw.productProfile,
@@ -206,12 +206,12 @@ function normalizeAiEngineReport(raw, project, model) {
     },
     differentiationAnalysis: {
       scores: [
-        { label: "Demand Score", value: aiScore.demandScore, reason: "OpenAI AI Engine output" },
-        { label: "Competition Score", value: aiScore.competitionScore, reason: "OpenAI AI Engine output" },
-        { label: "Virality Score", value: aiScore.viralityScore, reason: "OpenAI AI Engine output" },
-        { label: "Margin Score", value: aiScore.marginScore, reason: "OpenAI AI Engine output" },
-        { label: "Risk Score", value: aiScore.riskScore, reason: "OpenAI AI Engine output" },
-        { label: "Overall Score", value: aiScore.overallScore, reason: "OpenAI AI Engine output" }
+        { label: "Demand Score", value: aiScore.demandScore, reason: `${config.provider} AI Engine output` },
+        { label: "Competition Score", value: aiScore.competitionScore, reason: `${config.provider} AI Engine output` },
+        { label: "Virality Score", value: aiScore.viralityScore, reason: `${config.provider} AI Engine output` },
+        { label: "Margin Score", value: aiScore.marginScore, reason: `${config.provider} AI Engine output` },
+        { label: "Risk Score", value: aiScore.riskScore, reason: `${config.provider} AI Engine output` },
+        { label: "Overall Score", value: aiScore.overallScore, reason: `${config.provider} AI Engine output` }
       ],
       finalConclusion: raw.finalConclusion
     },
@@ -224,7 +224,7 @@ function normalizeAiEngineReport(raw, project, model) {
         label: key,
         score: value,
         dataType: "AI推理数据",
-        reason: "由 OpenAI AI Intelligence Engine 基于 Product Profile 推理生成。",
+        reason: `由 ${config.provider} AI Intelligence Engine 基于 Product Profile 推理生成。`,
         validationNeeded: "上线前需要用真实销售、广告、达人和竞品数据复核。"
       }))
     },
@@ -238,8 +238,8 @@ function normalizeAiEngineReport(raw, project, model) {
         { field: "平台", value: (project.platforms || []).join(", "), source: "用户输入", note: "用于渠道适配判断。" }
       ],
       aiInferredData: [
-        { field: "Product Profile", value: "OpenAI inference", basis: "产品输入与平台上下文", caution: "需要真实市场数据复核。" },
-        { field: "AI Score", value: "OpenAI scoring", basis: "Product Profile 和动态章节推理", caution: "不能作为确定销量承诺。" }
+        { field: "Product Profile", value: `${config.provider} inference`, basis: "产品输入与平台上下文", caution: "需要真实市场数据复核。" },
+        { field: "AI Score", value: `${config.provider} scoring`, basis: "Product Profile 和动态章节推理", caution: "不能作为确定销量承诺。" }
       ],
       humanAssumptions: [
         { field: "竞品链接", assumption: (project.competitorLinks || []).join(", ") || "未提供", owner: "运营", validationMethod: "人工核验链接产品是否为直接竞品。" }
@@ -248,7 +248,7 @@ function normalizeAiEngineReport(raw, project, model) {
     roleReviews: [],
     validationChecklist: [],
     factSafetyRule: "所有未接入真实平台数据的结论必须标注 Data Source 或 Model Reasoning，禁止写成确定事实。",
-    summary: `${project.productName} 已由 OpenAI AI Intelligence Engine 生成动态报告结构。`,
+    summary: `${project.productName} 已由 ${config.provider} AI Intelligence Engine 生成动态报告结构。`,
     recommendation: raw.finalConclusion.worthTesting,
     sections
   };
@@ -293,7 +293,7 @@ Demand Score, Competition Score, Virality Score, Margin Score, Risk Score, Overa
 }
 
 export async function generateAiEngineReport(project) {
-  const config = requireOpenAiConfig();
+  const config = requireAiConfig();
   const payload = await requestOpenAiResponses({
     model: config.model,
     input: buildPrompt(project),
@@ -308,7 +308,7 @@ export async function generateAiEngineReport(project) {
   });
   const parsed = parseOpenAiOutputJson(payload);
 
-  return normalizeAiEngineReport(parsed, project, config.model);
+  return normalizeAiEngineReport(parsed, project, config);
 }
 
 export async function generateAiEngineSection(project, sectionType) {

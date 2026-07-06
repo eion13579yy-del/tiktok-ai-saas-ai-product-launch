@@ -11,12 +11,14 @@ if (!config.configured) {
   print({
     ok: false,
     configured: false,
-    message: "OPENAI_API_KEY is not configured. Add it to .env or the process environment.",
+    provider: config.provider,
+    model: config.model,
+    message: `${config.provider === "deepseek" ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY"} is not configured. Add it to .env or the process environment.`,
     envFileLoaded: config.envFileLoaded,
     envFilePath: config.envFilePath
   });
 
-  if (process.env.REQUIRE_OPENAI === "1") {
+  if (process.env.REQUIRE_AI === "1" || process.env.REQUIRE_OPENAI === "1") {
     process.exit(1);
   }
 
@@ -27,7 +29,7 @@ try {
   const payload = await requestOpenAiResponses(
     {
       model: config.model,
-      input: "Return a short JSON health check for AI Product Launch OS.",
+      input: "Return a short JSON health check for AI Product Launch OS. Return JSON only.",
       text: {
         format: {
           type: "json_schema",
@@ -51,6 +53,7 @@ try {
   print({
     ok: true,
     configured: true,
+    provider: config.provider,
     model: config.model,
     responseId: payload.id,
     output: parseOpenAiOutputJson(payload)
@@ -59,9 +62,10 @@ try {
   print({
     ok: false,
     configured: true,
+    provider: config.provider,
     model: config.model,
     timeoutMs: 120_000,
-    message: "OpenAI API request failed. Check network connectivity, proxy settings, firewall rules, or API key permissions.",
+    message: "AI provider request failed. Check network connectivity, proxy settings, firewall rules, API key permissions, quota, or rate limits.",
     errorName: error.name,
     errorCode: error.cause?.code,
     errorMessage: error.cause?.message || error.message
