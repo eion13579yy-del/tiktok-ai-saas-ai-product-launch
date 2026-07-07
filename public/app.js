@@ -428,9 +428,9 @@ function renderLaunchReportV2(payload) {
     </article>
     <article>
       <span>智能评估结论</span>
-      <strong>${escapeHtml(report.productEvaluationModel?.conclusion || "待评估")}</strong>
+      <strong>爆款概率 ${escapeHtml(report.productEvaluationModel?.totalScore ?? report.opportunityScore ?? "待评估")} / 100</strong>
       <p>数据可信度：${escapeHtml(report.dataCredibilityScore ?? "未评分")} / 100</p>
-      <p>打品评分：${escapeHtml(report.productEvaluationModel?.totalScore ?? "未评分")} / 100</p>
+      <p>可导出PDF</p>
     </article>
   `;
   renderReportModules(report.sections || [], report.sections?.[0]?.type);
@@ -451,7 +451,7 @@ function ensureDownloadReportButton() {
   downloadReportButton = document.createElement("button");
   downloadReportButton.className = "ghost-button";
   downloadReportButton.type = "button";
-  downloadReportButton.textContent = "下载PDF";
+  downloadReportButton.textContent = "导出PDF";
   downloadReportButton.addEventListener("click", () => {
     if (!activeReport?.id) {
       return;
@@ -503,7 +503,6 @@ function scoreDimensionLabel(key) {
 
 function renderEvaluationLayer(report) {
   const model = report.productEvaluationModel;
-  const breakdown = report.dataSourceBreakdown || {};
   const scoreInsight =
     model?.scoreInsight ||
     report.aiEngine?.scoreInsight ||
@@ -517,86 +516,16 @@ function renderEvaluationLayer(report) {
     <section class="evaluation-layer">
       <div class="evaluation-header">
         <div>
-          <span>产品智能评估模型层</span>
-          <h3>${escapeHtml(model.conclusion)}</h3>
-          <p>${escapeHtml(model.conclusionReason)}</p>
+          <span>智能评估结论</span>
+          <h3>爆款概率 ${escapeHtml(model.totalScore ?? report.opportunityScore ?? "待评估")} / 100</h3>
+          <p>${escapeHtml(scoreInsight)}</p>
         </div>
         <div class="evaluation-score">
-          <span>打品评分</span>
-          <strong>${escapeHtml(model.totalScore)}</strong>
-          <p>数据可信度 ${escapeHtml(report.dataCredibilityScore)} / 100</p>
+          <span>可导出PDF</span>
+          <strong>${escapeHtml(report.dataCredibilityScore ?? "待评估")}</strong>
+          <p>数据可信度 / 100</p>
         </div>
       </div>
-
-      <p class="score-insight">${escapeHtml(scoreInsight)}</p>
-
-      <div class="evaluation-grid">
-        ${(model.dimensions || [])
-          .map(
-            (dimension) => `
-              <article class="evaluation-card">
-                <div class="evaluation-card-top">
-                  <span>${escapeHtml(scoreDimensionLabel(dimension.key || dimension.label))}</span>
-                  <strong>${escapeHtml(dimension.score)}</strong>
-                </div>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-
-      <div class="evidence-grid">
-        <section>
-          <h4>已验证数据</h4>
-          ${renderEvidenceItems(breakdown.verifiedData)}
-        </section>
-        <section>
-          <h4>AI推测数据</h4>
-          ${renderEvidenceItems(breakdown.aiInferredData)}
-        </section>
-        <section>
-          <h4>人工假设数据</h4>
-          ${renderEvidenceItems(breakdown.humanAssumptions, "assumption")}
-        </section>
-      </div>
-
-      <div class="role-review-grid">
-        ${(report.roleReviews || [])
-          .map(
-            (review) => `
-              <article class="role-review-card">
-                <h4>${escapeHtml(review.role)}</h4>
-                <div>
-                  <span>支持理由</span>
-                  ${(review.supportReasons || []).map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
-                </div>
-                <div>
-                  <span>反对理由</span>
-                  ${(review.objectionReasons || []).map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
-                </div>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-
-      <div class="validation-checklist">
-        <h4>待验证数据清单</h4>
-        ${(report.validationChecklist || [])
-          .map(
-            (item) => `
-              <article>
-                <span>${escapeHtml(item.priority)} · ${escapeHtml(item.owner)}</span>
-                <strong>${escapeHtml(item.item)}</strong>
-                <p>${escapeHtml(item.method)}</p>
-                <small>${item.blocksScaling ? "放量前必须完成" : "建议进入下一轮前完成"}</small>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-
-      <p class="fact-safety-rule">${escapeHtml(report.factSafetyRule)}</p>
     </section>
   `;
 }
