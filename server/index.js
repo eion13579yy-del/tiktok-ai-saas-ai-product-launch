@@ -13,6 +13,7 @@ const rootDir = path.resolve(__dirname, "..");
 const publicDir = path.join(rootDir, "public");
 
 const port = Number(process.env.PORT || 3000);
+const host = process.env.HOST || "0.0.0.0";
 const dataFile = path.resolve(rootDir, process.env.DATA_FILE || "data/db.json");
 const sessionCookieName = "aplo_session";
 let dbWriteQueue = Promise.resolve();
@@ -524,6 +525,7 @@ function createSession(db, user) {
 }
 
 async function getDatabaseStatus() {
+  await ensureDbFile();
   const exists = existsSync(dataFile);
 
   if (!exists) {
@@ -1589,7 +1591,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(port, () => {
-  console.log(`AI Product Launch OS is running at http://localhost:${port}`);
-  console.log(`Health check: http://localhost:${port}/api/health`);
+server.listen(port, host, () => {
+  console.log(`AI Product Launch OS is running at http://${host}:${port}`);
+  console.log(`Health check: http://${host}:${port}/api/health`);
 });
