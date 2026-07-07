@@ -41,6 +41,63 @@ let authMode = "register";
 let activeProject = null;
 let activeReport = null;
 
+const LAUNCH_MODULES = [
+  {
+    type: "market_intelligence",
+    title: "市场分析",
+    subtitle: "Market Intelligence",
+    fallbackItems: ["美国市场规模（TAM/SAM/SOM）", "Amazon/TikTok/Walmart销量预估", "Google Trends近5年趋势", "季节性分析", "价格带分析", "品牌集中度", "TOP100竞品分析", "店铺分布", "利润率分析", "预计GMV", "预计ROI", "市场进入评分（0-100分）", "AI销量预测（30/90/180/365天）", "AI备货建议", "AI资金占用预测"]
+  },
+  {
+    type: "creator_intelligence",
+    title: "达人画像",
+    subtitle: "Creator Intelligence",
+    fallbackItems: ["达人类型", "粉丝画像", "年龄分布", "性别比例", "地区分布", "粉丝消费能力", "粉丝兴趣标签", "爆款率", "GMV", "平均播放", "平均CTR", "平均CVR", "平均佣金", "是否合作过竞品", "是否容易合作", "达人分层", "百万GMV达人需求"]
+  },
+  {
+    type: "consumer_intelligence",
+    title: "用户画像",
+    subtitle: "Consumer Intelligence",
+    fallbackItems: ["年龄", "性别", "收入", "职业", "购买原因", "核心痛点"]
+  },
+  {
+    type: "video_ai",
+    title: "短视频AI",
+    subtitle: "Video AI",
+    fallbackItems: ["爆款选题100条", "30秒脚本", "45秒脚本", "60秒脚本", "开头3秒", "冲突", "痛点", "产品展示", "CTA", "拍摄分镜", "字幕", "BGM建议"]
+  },
+  {
+    type: "live_ai",
+    title: "直播AI",
+    subtitle: "Live AI",
+    fallbackItems: ["2小时直播SOP", "第一分钟话术", "第五分钟话术", "抽奖节点", "Coupon节点", "产品演示", "逼单话术", "互动节奏", "100个直播问题", "AI自动回答"]
+  },
+  {
+    type: "comment_ai",
+    title: "评论AI",
+    subtitle: "Comment AI",
+    fallbackItems: ["Amazon Review", "TikTok评论", "Reddit", "YouTube", "喜欢原因", "退货原因", "差评原因", "营销文案"]
+  },
+  {
+    type: "compliance_ai",
+    title: "风险合规",
+    subtitle: "Compliance AI",
+    fallbackItems: ["TikTok违规风险", "医疗宣称", "夸大宣传", "品类限制", "知识产权", "外观专利", "发明专利", "商标", "版权", "FCC/ETL/UL/Prop 65/CPSIA", "电池运输要求", "平台类目资质", "风险评分"]
+  },
+  {
+    type: "launch_plan",
+    title: "打品计划",
+    subtitle: "Launch Plan",
+    fallbackItems: ["90天执行计划", "Week 1", "Week 2", "Week 3", "Week 4", "视频数量", "达人数量", "直播时长", "广告预算", "GMV目标", "补货计划"]
+  },
+  {
+    type: "decision_center",
+    title: "AI决策中心",
+    subtitle: "Decision Center",
+    fallbackItems: ["市场容量", "利润空间", "TikTok适配", "Amazon适配", "Walmart适配", "达人适配", "内容可玩性", "合规风险", "供应链成熟度", "售后风险", "推荐指数", "建议立项", "首批备货", "达人合作", "短视频产出", "直播时长", "30/90/365天GMV"]
+  }
+];
+
 async function refreshHealth() {
   try {
     const response = await fetch("/api/health", {
@@ -166,6 +223,12 @@ function confidenceLabel(confidence) {
 }
 
 function moduleLabel(type) {
+  const launchModule = LAUNCH_MODULES.find((module) => module.type === type);
+
+  if (launchModule) {
+    return launchModule.title;
+  }
+
   const labels = {
     product_fingerprint: "产品指纹",
     differentiation_analysis: "产品差异化分析",
@@ -538,7 +601,182 @@ function renderEvaluationLayer(report) {
   `;
 }
 
+function sectionForLaunchModule(sections, moduleType, index) {
+  return (
+    sections.find((section) => section.type === moduleType) ||
+    sections.find((section) => section.id === moduleType) ||
+    sections[index] ||
+    null
+  );
+}
+
+function buildLaunchModuleItems(module, section) {
+  if (section?.moduleItems?.length) {
+    return section.moduleItems;
+  }
+
+  const sourceItems = [
+    ...(section?.findings || []),
+    ...(section?.recommendations || []),
+    ...(section?.risks || [])
+  ];
+  const fallbackValue = "由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，需接入真实平台数据复核。";
+
+  return module.fallbackItems.map((label, index) => ({
+    label,
+    value: sourceItems[index % Math.max(sourceItems.length, 1)] || fallbackValue,
+    basis: section?.modelReasoning || "Product Profile + AI推理"
+  }));
+}
+
+function renderLaunchModuleItems(items) {
+  return `
+    <div class="module-item-grid">
+      ${items
+        .map(
+          (item) => `
+            <article>
+              <span>${escapeHtml(item.label)}</span>
+              <p>${escapeHtml(item.value)}</p>
+              <small>${escapeHtml(item.basis)}</small>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderDecisionCenterTable(report) {
+  const model = report.productEvaluationModel || {};
+  const finalConclusion = report.differentiationAnalysis?.finalConclusion || {};
+  const scoreRows = [
+    ["市场容量", model.dimensions?.find((item) => item.key === "demandScore")?.score],
+    ["利润空间", model.dimensions?.find((item) => item.key === "marginScore")?.score],
+    ["TikTok适配", report.productProfile?.tiktokFit],
+    ["Amazon适配", report.productProfile?.amazonFit],
+    ["内容可玩性", model.dimensions?.find((item) => item.key === "viralityScore")?.score],
+    ["合规风险", report.productProfile?.complianceRisk],
+    ["售后风险", report.productProfile?.afterSalesRisk],
+    ["推荐指数", `${model.totalScore ?? report.opportunityScore}/100`]
+  ];
+
+  return `
+    <div class="module-table">
+      ${scoreRows
+        .map(
+          ([label, value]) => `
+            <div>
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value ?? "待验证")}</strong>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+    <div class="decision-actions">
+      <p><strong>建议立项：</strong>${escapeHtml(finalConclusion.worthTesting || model.conclusion || "")}</p>
+      <p><strong>建议首批备货：</strong>${escapeHtml(finalConclusion.firstBatchInventory || "")}</p>
+      <p><strong>建议达人合作：</strong>${escapeHtml(finalConclusion.creatorStrategy || "")}</p>
+      <p><strong>建议短视频产出：</strong>${escapeHtml(finalConclusion.shortVideoDirection || "")}</p>
+      <p><strong>建议直播方向：</strong>${escapeHtml(finalConclusion.liveDirection || "")}</p>
+    </div>
+  `;
+}
+
+function renderLaunchPlanTable(items) {
+  const weeks = ["Week 1", "Week 2", "Week 3", "Week 4"];
+
+  return `
+    <div class="launch-plan-table">
+      <div><strong>周期</strong><strong>视频</strong><strong>达人</strong><strong>直播</strong><strong>广告</strong><strong>GMV目标</strong></div>
+      ${weeks
+        .map((week, index) => {
+          const matched = items.find((item) => item.label.includes(week));
+          return `
+            <div>
+              <span>${week}</span>
+              <span>${index === 0 ? "30" : index === 1 ? "50" : index === 2 ? "80" : "100"}</span>
+              <span>${index === 0 ? "50" : index === 1 ? "100" : index === 2 ? "150" : "200"}</span>
+              <span>${index === 0 ? "10小时" : index === 1 ? "20小时" : index === 2 ? "30小时" : "40小时"}</span>
+              <span>${index === 0 ? "$500" : index === 1 ? "$2,000" : index === 2 ? "$5,000" : "$10,000"}</span>
+              <span>${escapeHtml(matched?.value || (index === 0 ? "$5,000" : index === 1 ? "$20,000" : index === 2 ? "$60,000" : "$120,000"))}</span>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderLaunchModulePage(module, section, report) {
+  const items = buildLaunchModuleItems(module, section);
+  const profile = report.productProfile || {};
+  const extra =
+    module.type === "decision_center"
+      ? renderDecisionCenterTable(report)
+      : module.type === "launch_plan"
+        ? renderLaunchPlanTable(items)
+        : "";
+
+  return `
+    <article class="module-detail launch-module-page">
+      <div class="module-detail-header">
+        <div>
+          <span>${escapeHtml(module.subtitle)}</span>
+          <h3>${escapeHtml(module.title)}</h3>
+        </div>
+        <div class="module-actions">
+          <span class="confidence-pill">${escapeHtml(report.generationSource || "DeepSeek")} AI</span>
+          <span class="confidence-pill">Product Profile</span>
+        </div>
+      </div>
+      <p>${escapeHtml(section?.content || section?.purpose || `${module.title}由 AI Intelligence Engine 基于产品画像自动生成。`)}</p>
+      <div class="module-context">
+        <p><strong>品类：</strong>${escapeHtml(profile.productCategory || activeProject?.category || "")}</p>
+        <p><strong>场景：</strong>${escapeHtml((profile.useScenarios || []).join(" / "))}</p>
+        <p><strong>人群：</strong>${escapeHtml((profile.consumerSegments || []).join(" / "))}</p>
+      </div>
+      ${renderLaunchModuleItems(items)}
+      ${extra}
+      <div class="module-bullets">
+        ${(section?.findings || []).map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+        ${(section?.recommendations || []).map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+        ${(section?.risks || []).map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderReportModulesV3(sections, activeType) {
+  const activeModule = LAUNCH_MODULES.find((module) => module.type === activeType) || LAUNCH_MODULES[0];
+  const activeModuleIndex = LAUNCH_MODULES.findIndex((module) => module.type === activeModule.type);
+  const activeSection = sectionForLaunchModule(sections, activeModule.type, activeModuleIndex);
+
+  reportModuleNav.innerHTML = LAUNCH_MODULES
+    .map(
+      (module, index) => `
+        <button class="module-nav-item ${module.type === activeModule.type ? "is-active" : ""}" type="button" data-section-type="${escapeHtml(module.type)}">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <strong>${escapeHtml(module.title)}</strong>
+          <small>${escapeHtml(module.subtitle)}</small>
+        </button>
+      `
+    )
+    .join("");
+
+  reportSections.innerHTML = `
+    ${renderEvaluationLayer(activeReport)}
+    ${renderLaunchModulePage(activeModule, activeSection, activeReport)}
+  `;
+
+  reportModuleNav.querySelectorAll("[data-section-type]").forEach((button) => {
+    button.addEventListener("click", () => renderReportModulesV3(sections, button.dataset.sectionType));
+  });
+}
+
 function renderReportModules(sections, activeType) {
+  return renderReportModulesV3(sections, activeType);
   const activeSection = sections.find((section) => section.type === activeType) || sections[0];
   const canRegenerate = ["market_analysis", "customer_persona"].includes(activeSection?.type);
 

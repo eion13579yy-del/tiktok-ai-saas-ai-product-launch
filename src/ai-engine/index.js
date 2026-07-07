@@ -10,16 +10,45 @@ const AI_ENGINE_SECTION_SCHEMA = {
     "purpose",
     "dataSource",
     "modelReasoning",
+    "moduleItems",
     "findings",
     "recommendations",
     "risks"
   ],
   properties: {
-    id: { type: "string" },
+    id: {
+      type: "string",
+      enum: [
+        "market_intelligence",
+        "creator_intelligence",
+        "consumer_intelligence",
+        "video_ai",
+        "live_ai",
+        "comment_ai",
+        "compliance_ai",
+        "launch_plan",
+        "decision_center"
+      ]
+    },
     title: { type: "string" },
     purpose: { type: "string" },
     dataSource: { type: "string" },
     modelReasoning: { type: "string" },
+    moduleItems: {
+      type: "array",
+      minItems: 6,
+      maxItems: 24,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "value", "basis"],
+        properties: {
+          label: { type: "string" },
+          value: { type: "string" },
+          basis: { type: "string" }
+        }
+      }
+    },
     findings: { type: "array", items: { type: "string" } },
     recommendations: { type: "array", items: { type: "string" } },
     risks: { type: "array", items: { type: "string" } }
@@ -127,8 +156,8 @@ export const AI_ENGINE_REPORT_SCHEMA = {
     },
     sections: {
       type: "array",
-      minItems: 4,
-      maxItems: 12,
+      minItems: 9,
+      maxItems: 9,
       items: AI_ENGINE_SECTION_SCHEMA
     }
   }
@@ -176,6 +205,7 @@ function toLegacySection(section) {
     ],
     dataSource: section.dataSource,
     modelReasoning: section.modelReasoning,
+    moduleItems: section.moduleItems,
     findings: section.findings,
     recommendations: section.recommendations,
     risks: section.risks
@@ -298,11 +328,24 @@ Demand Score, Competition Score, Virality Score, Margin Score, Risk Score, Overa
 
 export async function generateAiEngineReport(project) {
   const config = requireAiConfig();
+  const modulePrompt = [
+    buildPrompt(project),
+    "scoreInsight 必须是一句简体中文点评，由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，只说明评分背后的核心判断，不要重复每个评分维度的通用说明。",
+    "sections 必须固定输出 9 个模块，id 和顺序必须完全如下：",
+    "1. market_intelligence：市场分析（Market Intelligence），覆盖 TAM/SAM/SOM、Amazon/TikTok/Walmart销量预估、Google Trends近5年趋势、季节性、价格带、品牌集中度、TOP100竞品、店铺分布、利润率、预计GMV、预计ROI、市场进入评分、30/90/180/365天销量预测、备货建议、资金占用预测。",
+    "2. creator_intelligence：达人画像（Creator Intelligence），覆盖达人类型、粉丝画像、年龄、性别、地区、消费能力、兴趣标签、爆款率、GMV、播放、CTR、CVR、佣金、竞品合作、合作难度、达人分层和百万GMV所需达人数量。",
+    "3. consumer_intelligence：用户画像（Consumer Intelligence），覆盖年龄、性别、收入、职业、购买原因和核心痛点。",
+    "4. video_ai：短视频AI（Video AI），覆盖爆款选题方向、30/45/60秒脚本、开头3秒、冲突、痛点、产品展示、CTA、分镜、字幕和BGM建议。",
+    "5. live_ai：直播AI（Live AI），覆盖2小时直播SOP、抽奖、Coupon、演示、逼单、互动和常见直播问答。",
+    "6. comment_ai：评论AI（Comment AI），覆盖 Amazon Review、TikTok评论、Reddit、YouTube、喜欢原因、退货原因、差评原因和营销文案。",
+    "7. compliance_ai：风险合规（Compliance AI），覆盖 TikTok违规、医疗宣称、夸大宣传、品类限制、知识产权、专利、商标、版权、FCC/ETL/UL/Prop 65/CPSIA/电池运输/平台资质和风险评分。",
+    "8. launch_plan：打品计划（Launch Plan），覆盖90天计划、每周视频数、达人、直播、广告预算、GMV目标、补货和放大规则。",
+    "9. decision_center：AI决策中心（Decision Center），覆盖市场容量、利润空间、TikTok/Amazon/Walmart适配、达人适配、内容可玩性、合规风险、供应链成熟度、售后风险、推荐指数、是否立项、首批备货、达人合作、短视频产出、直播时长、30/90/365天GMV。",
+    "每个 section 的 moduleItems 必须逐项生成中文业务内容。没有真实外部数据时，value 必须写成 AI推测/待验证口径，不能写成确定事实。"
+  ].join("\n\n");
   const payload = await requestOpenAiResponses({
     model: config.model,
-    input: `${buildPrompt(project)}
-
-scoreInsight 必须是一句简体中文点评，由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，只说明评分背后的核心判断，不要重复每个评分维度的通用说明。`,
+    input: modulePrompt,
     text: {
       format: {
         type: "json_schema",

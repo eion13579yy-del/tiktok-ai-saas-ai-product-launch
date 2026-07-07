@@ -752,6 +752,24 @@ h1 {
   gap: 8px;
 }
 
+.module-nav-item {
+  align-items: flex-start;
+}
+
+.module-nav-item strong,
+.module-nav-item small {
+  display: block;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.module-nav-item small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .confidence-pill {
   display: inline-flex;
   align-items: center;
@@ -762,6 +780,99 @@ h1 {
   background: #eef6f6;
   font-size: 13px;
   font-weight: 800;
+}
+
+.launch-module-page > p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.module-context,
+.decision-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.module-context p,
+.decision-actions p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.module-item-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.module-item-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.module-item-grid span,
+.module-table span {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.module-item-grid p,
+.module-item-grid small {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.module-table,
+.launch-plan-table {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.module-table {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.module-table div {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.module-table strong {
+  font-size: 20px;
+}
+
+.launch-plan-table > div {
+  display: grid;
+  grid-template-columns: 0.8fr repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.launch-plan-table > div:first-child {
+  color: var(--accent-strong);
+  background: #eef6f6;
 }
 
 .score-grid {
@@ -1442,6 +1553,8 @@ article p {
   .report-workspace,
   .evaluation-header,
   .evaluation-grid,
+  .module-item-grid,
+  .module-table,
   .evidence-grid,
   .role-review-grid,
   .validation-checklist article,
@@ -1462,6 +1575,10 @@ article p {
     .script-two-col,
   .script-meta,
   .action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-plan-table > div {
     grid-template-columns: 1fr;
   }
 

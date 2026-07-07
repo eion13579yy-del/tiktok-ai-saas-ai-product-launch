@@ -61,6 +61,16 @@ for (const token of [
   "Risk Score",
   "Overall Score",
   "scoreInsight",
+  "market_intelligence",
+  "creator_intelligence",
+  "consumer_intelligence",
+  "video_ai",
+  "live_ai",
+  "comment_ai",
+  "compliance_ai",
+  "launch_plan",
+  "decision_center",
+  "moduleItems",
   "dataSource",
   "modelReasoning"
 ]) {
