@@ -90,6 +90,7 @@ assert(Array.isArray(report.dataSourceBreakdown.humanAssumptions) && report.data
 const model = report.productEvaluationModel;
 assert(model, "Report should include product evaluation model.");
 assert(Number.isInteger(model.totalScore) && model.totalScore >= 0 && model.totalScore <= 100, "Product evaluation score should be 0-100.");
+assert(model.scoreInsight, "Evaluation model should include one score insight.");
 assert(["可测品", "谨慎测品", "不建议进入"].includes(model.conclusion), "Conclusion should use the required three-state model.");
 
 const requiredDimensions = [
@@ -107,8 +108,7 @@ for (const key of requiredDimensions) {
 
 for (const dimension of model.dimensions) {
   assert(Number.isInteger(dimension.score) && dimension.score >= 0 && dimension.score <= 100, "Each dimension should include a 0-100 score.");
-  assert(["已验证数据", "AI推测数据", "人工假设数据"].includes(dimension.dataType), "Each dimension should identify its data type.");
-  assert(dimension.reason && dimension.validationNeeded, "Each dimension should include reason and validation action.");
+  assert(!dimension.reason && !dimension.validationNeeded && !dimension.dataType, "Score cards should not repeat generic reasoning or validation copy.");
 }
 
 const requiredRoles = ["选品经理", "财务经理", "达人运营", "风控经理", "供应链经理"];

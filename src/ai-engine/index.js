@@ -33,6 +33,7 @@ export const AI_ENGINE_REPORT_SCHEMA = {
     "productProfile",
     "reportArchitecture",
     "aiScore",
+    "scoreInsight",
     "finalConclusion",
     "sections"
   ],
@@ -101,6 +102,7 @@ export const AI_ENGINE_REPORT_SCHEMA = {
         overallScore: { type: "number" }
       }
     },
+    scoreInsight: { type: "string" },
     finalConclusion: {
       type: "object",
       additionalProperties: false,
@@ -190,6 +192,9 @@ function normalizeAiEngineReport(raw, project, config) {
     overallScore: clampScore(raw.aiScore?.overallScore)
   };
   const sections = raw.sections.map(toLegacySection);
+  const scoreInsight =
+    raw.scoreInsight ||
+    `${config.provider} AI Intelligence Engine 基于 Product Profile 完成评分推理，建议优先用最高分维度设计测品动作，用最低分维度作为上线前复核重点。`;
 
   return {
     status: "completed",
@@ -202,6 +207,7 @@ function normalizeAiEngineReport(raw, project, config) {
       productProfile: raw.productProfile,
       reportArchitecture: raw.reportArchitecture,
       aiScore,
+      scoreInsight,
       finalConclusion: raw.finalConclusion
     },
     differentiationAnalysis: {
@@ -219,13 +225,11 @@ function normalizeAiEngineReport(raw, project, config) {
       totalScore: aiScore.overallScore,
       conclusion: raw.finalConclusion.worthTesting,
       conclusionReason: raw.reportArchitecture.strategy,
+      scoreInsight,
       dimensions: Object.entries(aiScore).map(([key, value]) => ({
         key,
         label: key,
-        score: value,
-        dataType: "AI推理数据",
-        reason: `由 ${config.provider} AI Intelligence Engine 基于 Product Profile 推理生成。`,
-        validationNeeded: "上线前需要用真实销售、广告、达人和竞品数据复核。"
+        score: value
       }))
     },
     dataCredibilityScore: 65,
@@ -296,7 +300,9 @@ export async function generateAiEngineReport(project) {
   const config = requireAiConfig();
   const payload = await requestOpenAiResponses({
     model: config.model,
-    input: buildPrompt(project),
+    input: `${buildPrompt(project)}
+
+scoreInsight 必须是一句简体中文点评，由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，只说明评分背后的核心判断，不要重复每个评分维度的通用说明。`,
     text: {
       format: {
         type: "json_schema",

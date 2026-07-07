@@ -60,6 +60,7 @@ for (const token of [
   "Margin Score",
   "Risk Score",
   "Overall Score",
+  "scoreInsight",
   "dataSource",
   "modelReasoning"
 ]) {

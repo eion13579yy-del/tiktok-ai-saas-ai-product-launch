@@ -425,9 +425,26 @@ function renderEvidenceItems(items, valueKey = "value") {
     .join("");
 }
 
+function scoreDimensionLabel(key) {
+  const labels = {
+    demandScore: "市场需求",
+    competitionScore: "竞品验证",
+    viralityScore: "内容传播",
+    marginScore: "利润空间",
+    riskScore: "风险控制",
+    overallScore: "综合评分"
+  };
+
+  return labels[key] || key;
+}
+
 function renderEvaluationLayer(report) {
   const model = report.productEvaluationModel;
   const breakdown = report.dataSourceBreakdown || {};
+  const scoreInsight =
+    model?.scoreInsight ||
+    report.aiEngine?.scoreInsight ||
+    `${report.generationSource || "DeepSeek"} AI Intelligence Engine 基于 Product Profile 完成评分推理，建议优先用高分维度设计测品动作，用低分维度作为上线前复核重点。`;
 
   if (!model) {
     return "";
@@ -448,18 +465,17 @@ function renderEvaluationLayer(report) {
         </div>
       </div>
 
+      <p class="score-insight">${escapeHtml(scoreInsight)}</p>
+
       <div class="evaluation-grid">
         ${(model.dimensions || [])
           .map(
             (dimension) => `
               <article class="evaluation-card">
                 <div class="evaluation-card-top">
-                  <span>${escapeHtml(dimension.label)}</span>
+                  <span>${escapeHtml(scoreDimensionLabel(dimension.key || dimension.label))}</span>
                   <strong>${escapeHtml(dimension.score)}</strong>
                 </div>
-                <p>${escapeHtml(dimension.reason)}</p>
-                <div class="data-badge ${dataTypeClass(dimension.dataType)}">${escapeHtml(dimension.dataType)}</div>
-                <small>下一步验证：${escapeHtml(dimension.validationNeeded)}</small>
               </article>
             `
           )
