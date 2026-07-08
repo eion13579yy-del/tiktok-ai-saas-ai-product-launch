@@ -94,6 +94,9 @@ body {
 
 .app-layout {
   padding-top: 34px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
 }
 
 .app-header {
@@ -102,6 +105,7 @@ body {
   justify-content: space-between;
   gap: 24px;
   padding: 54px 0 24px;
+  grid-column: 1 / -1;
 }
 
 .eyebrow,
@@ -304,12 +308,16 @@ h1 {
 
 .app-nav {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: start;
   gap: 8px;
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfd;
+  position: sticky;
+  top: 18px;
 }
 
 .nav-item {
@@ -321,6 +329,7 @@ h1 {
   background: transparent;
   font: inherit;
   font-weight: 800;
+  text-align: left;
   cursor: pointer;
 }
 
@@ -332,6 +341,12 @@ h1 {
 
 .dashboard-panel {
   margin-top: 18px;
+  min-width: 0;
+}
+
+.app-layout > .dashboard-panel,
+.app-layout > .next-card {
+  grid-column: 2;
 }
 
 .metric-grid {
@@ -380,6 +395,14 @@ h1 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.is-generating {
+  cursor: progress;
+}
+
+.is-error {
+  color: var(--danger);
 }
 
 .empty-state {
@@ -1526,6 +1549,106 @@ article p {
   white-space: nowrap;
 }
 
+.pdf-export-body {
+  background: #ffffff;
+}
+
+.pdf-export-document {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 28px;
+  color: #172033;
+  background: #ffffff;
+}
+
+.print-cover {
+  min-height: 260px;
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  break-after: page;
+}
+
+.print-cover h1 {
+  max-width: 780px;
+  font-size: 44px;
+  line-height: 1.12;
+}
+
+.print-cover p:not(.label) {
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.print-section {
+  margin: 0 0 16px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.report-summary article,
+.detail-grid article,
+.module-detail,
+.module-item-grid article,
+.module-table div,
+.launch-plan-table > div,
+.profile-grid article,
+.final-conclusion-grid article,
+.differentiation-score-grid article {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+
+  .pdf-export-document {
+    width: auto;
+    padding: 0;
+  }
+
+  .print-cover,
+  .print-section,
+  .evaluation-layer,
+  .module-detail,
+  .module-item-grid article,
+  .module-table div,
+  .launch-plan-table > div {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .launch-module-page {
+    break-before: page;
+  }
+
+  .module-actions,
+  .script-actions,
+  .section-actions,
+  button {
+    display: none !important;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+}
+
 @media (max-width: 760px) {
   .shell {
     padding: 16px;
@@ -1559,8 +1682,14 @@ article p {
     padding: 48px 0 30px;
   }
 
+  .app-layout {
+    display: block;
+  }
+
   .app-nav {
+    flex-direction: row;
     overflow-x: auto;
+    position: static;
   }
 
   .metric-grid,

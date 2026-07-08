@@ -40,6 +40,7 @@ let downloadReportButton = null;
 let authMode = "register";
 let activeProject = null;
 let activeReport = null;
+const PROJECT_DRAFT_KEY = "ai_product_launch_project_draft";
 
 const LAUNCH_MODULES = [
   {
@@ -128,10 +129,16 @@ async function requestJson(url, options = {}) {
       ...(options.headers || {})
     }
   });
-  const payload = await response.json();
+  let payload = {};
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
 
   if (!response.ok) {
-    throw new Error(payload.message || "请求失败。");
+    throw new Error(mapApiError(payload.message || payload.error, response.status));
   }
 
   return payload;
@@ -171,6 +178,36 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function safeFileName(value) {
+  return String(value || "AI_Product_Launch_Report")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 80);
+}
+
+function mapApiError(message, status) {
+  const normalized = String(message || "").toLowerCase();
+
+  if (
+    status === 402 ||
+    status === 429 ||
+    normalized.includes("quota") ||
+    normalized.includes("billing") ||
+    normalized.includes("balance") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("rate limit")
+  ) {
+    return "OpenAI API 额度不足，请检查 Billing。";
+  }
+
+  if (status >= 500) {
+    return message || "生成失败，服务暂时不可用，请稍后重试。";
+  }
+
+  return message || "请求失败，请检查输入后重试。";
 }
 
 function projectStatusLabel(status) {
@@ -312,8 +349,9 @@ function renderProjectDetail(project) {
   activeProject = project;
   projectDetailTitle.textContent = project.productName;
   reportMessage.textContent = "";
+  reportMessage.classList.remove("is-error");
   generateReportButton.disabled = false;
-  generateReportButton.textContent = project.latestReportId ? "重新生成报告" : "生成报告";
+  generateReportButton.textContent = project.latestReportId ? "重新生成" : "生成报告";
   viewReportButton.classList.toggle("hidden", !project.latestReportId);
   projectDetail.innerHTML = `
     <article>
@@ -407,6 +445,7 @@ function renderLaunchReportV2(payload) {
   activeReport = report;
   activeProject = project || activeProject;
   ensureDownloadReportButton();
+  reportMessage.textContent = "";
   reportTitle.textContent = project?.productName || "打品报告";
   reportSummary.innerHTML = `
     <article>
@@ -430,7 +469,7 @@ function renderLaunchReportV2(payload) {
       <span>智能评估结论</span>
       <strong>爆款概率 ${escapeHtml(report.productEvaluationModel?.totalScore ?? report.opportunityScore ?? "待评估")} / 100</strong>
       <p>数据可信度：${escapeHtml(report.dataCredibilityScore ?? "未评分")} / 100</p>
-      <p>可导出PDF</p>
+      <p>可导出 PDF</p>
     </article>
   `;
   renderReportModules(report.sections || [], report.sections?.[0]?.type);
@@ -449,16 +488,10 @@ function ensureDownloadReportButton() {
   }
 
   downloadReportButton = document.createElement("button");
-  downloadReportButton.className = "ghost-button";
+  downloadReportButton.className = "primary-action";
   downloadReportButton.type = "button";
-  downloadReportButton.textContent = "导出PDF";
-  downloadReportButton.addEventListener("click", () => {
-    if (!activeReport?.id) {
-      return;
-    }
-
-    window.open(`/api/launch-reports/${activeReport.id}/pdf`, "_blank");
-  });
+  downloadReportButton.textContent = "导出 PDF";
+  downloadReportButton.addEventListener("click", exportActiveReportPdf);
   headingActions.insertBefore(downloadReportButton, backToDetailButton);
 }
 
@@ -675,6 +708,132 @@ function renderLaunchModulePage(module, section, report) {
       </div>
     </article>
   `;
+}
+
+function renderPrintableReport() {
+  if (!activeReport) {
+    return "";
+  }
+
+  const report = activeReport;
+  const project = activeProject || {};
+  const sections = report.sections || [];
+  const modulePages = LAUNCH_MODULES
+    .map((module, index) => renderLaunchModulePage(module, sectionForLaunchModule(sections, module.type, index), report))
+    .join("");
+
+  return `
+    <section class="print-cover">
+      <p class="label">AI Product Launch Report</p>
+      <h1>${escapeHtml(project.productName || reportTitle.textContent || "打品报告")}</h1>
+      <p>${escapeHtml(report.summary || "基于 Product Profile 和 AI Intelligence Engine 生成的打品报告。")}</p>
+    </section>
+    <section class="print-section">
+      <h2>产品基础信息</h2>
+      <div class="module-table">
+        <div><span>产品名称</span><strong>${escapeHtml(project.productName || "")}</strong></div>
+        <div><span>目标市场</span><strong>${escapeHtml(project.targetMarket || "")}</strong></div>
+        <div><span>平台</span><strong>${escapeHtml((project.platforms || []).join(", "))}</strong></div>
+        <div><span>目标售价</span><strong>${escapeHtml(project.targetPrice ?? "未填写")}</strong></div>
+        <div><span>成本</span><strong>${escapeHtml(project.costPrice ?? "未填写")}</strong></div>
+        <div><span>竞品链接</span><strong>${escapeHtml((project.competitorLinks || []).join(" / ") || "未提供")}</strong></div>
+      </div>
+    </section>
+    ${renderEvaluationLayer(report)}
+    ${modulePages}
+  `;
+}
+
+function exportActiveReportPdf() {
+  if (!activeReport) {
+    reportMessage.textContent = "请先生成或打开一份报告，再导出 PDF。";
+    return;
+  }
+
+  const productName = activeProject?.productName || reportTitle.textContent || "产品";
+  const fileName = `${safeFileName(productName)}_AI_Product_Launch_Report.pdf`;
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    reportMessage.textContent = "浏览器阻止了 PDF 导出窗口，请允许弹窗后重试。";
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="zh-CN">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>${escapeHtml(fileName)}</title>
+        <link rel="stylesheet" href="/styles.css">
+      </head>
+      <body class="pdf-export-body">
+        <main class="pdf-export-document">
+          ${renderPrintableReport()}
+        </main>
+        <script>
+          window.addEventListener("load", () => {
+            document.title = ${JSON.stringify(fileName)};
+            setTimeout(() => window.print(), 300);
+          });
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+function projectFormSnapshot() {
+  const formData = new FormData(projectForm);
+
+  return {
+    productName: formData.get("productName") || "",
+    category: formData.get("category") || "",
+    targetMarket: formData.get("targetMarket") || "",
+    platforms: formData.getAll("platforms"),
+    competitorLinks: formData.get("competitorLinks") || "",
+    targetPrice: formData.get("targetPrice") || "",
+    costPrice: formData.get("costPrice") || "",
+    inventory: formData.get("inventory") || "",
+    leadTimeDays: formData.get("leadTimeDays") || ""
+  };
+}
+
+function persistProjectFormDraft() {
+  localStorage.setItem(PROJECT_DRAFT_KEY, JSON.stringify(projectFormSnapshot()));
+}
+
+function restoreProjectFormDraft() {
+  const raw = localStorage.getItem(PROJECT_DRAFT_KEY);
+
+  if (!raw) {
+    return;
+  }
+
+  try {
+    const draft = JSON.parse(raw);
+    Object.entries(draft).forEach(([key, value]) => {
+      if (key === "platforms") {
+        projectForm.querySelectorAll('input[name="platforms"]').forEach((input) => {
+          input.checked = (value || []).includes(input.value);
+        });
+        return;
+      }
+
+      if (projectForm.elements[key]) {
+        projectForm.elements[key].value = value;
+      }
+    });
+  } catch {
+    localStorage.removeItem(PROJECT_DRAFT_KEY);
+  }
+}
+
+function setupProjectDraftPersistence() {
+  restoreProjectFormDraft();
+  projectForm.addEventListener("input", persistProjectFormDraft);
+  projectForm.addEventListener("change", persistProjectFormDraft);
 }
 
 function renderReportModulesV3(sections, activeType) {
@@ -1948,6 +2107,7 @@ async function generateLaunchReport() {
   generateReportButton.disabled = true;
   generateReportButton.textContent = "生成中...";
   reportMessage.textContent = "正在生成打品报告...";
+  document.body.classList.add("is-generating");
 
   try {
     const payload = await requestJson(`/api/product-projects/${activeProject.id}/launch-report/generate`, {
@@ -1960,8 +2120,11 @@ async function generateLaunchReport() {
     switchPanel("report-panel");
   } catch (error) {
     reportMessage.textContent = error.message;
+    reportMessage.classList.add("is-error");
     generateReportButton.disabled = false;
-    generateReportButton.textContent = "生成报告";
+    generateReportButton.textContent = activeProject.latestReportId ? "重新生成" : "生成报告";
+  } finally {
+    document.body.classList.remove("is-generating");
   }
 }
 
@@ -2036,15 +2199,13 @@ projectForm.addEventListener("submit", async (event) => {
     inventory: formData.get("inventory"),
     leadTimeDays: formData.get("leadTimeDays")
   };
+  persistProjectFormDraft();
 
   try {
     const payload = await requestJson("/api/product-projects", {
       method: "POST",
       body: JSON.stringify(body)
     });
-    projectForm.reset();
-    projectForm.elements.targetMarket.value = "美国";
-    projectForm.querySelector('input[value="TikTok"]').checked = true;
     projectMessage.textContent = "";
     await refreshProjects();
     renderProjectDetail(payload.project);
@@ -2092,5 +2253,6 @@ backToDetailButton.addEventListener("click", () => {
 });
 
 setMode("register");
+setupProjectDraftPersistence();
 refreshHealth();
 refreshSession();

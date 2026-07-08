@@ -834,6 +834,37 @@ async function handleGetProductProject(req, res, projectId) {
 
 function formatAiGenerationError(error) {
   const message = String(error?.message || "");
+  const normalized = message.toLowerCase();
+
+  if (message === "OPENAI_API_KEY is not configured.") {
+    return "OPENAI_API_KEY 未配置，无法调用真实大模型。请在环境变量中配置 OPENAI_API_KEY。";
+  }
+
+  if (message === "DEEPSEEK_API_KEY is not configured.") {
+    return "DEEPSEEK_API_KEY 未配置，无法调用 DeepSeek 大模型。请在环境变量中配置 DEEPSEEK_API_KEY。";
+  }
+
+  if (
+    normalized.includes("insufficient_quota") ||
+    normalized.includes("quota") ||
+    normalized.includes("billing") ||
+    normalized.includes("balance") ||
+    normalized.includes("402") ||
+    normalized.includes("payment required") ||
+    normalized.includes("429") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("rate limit")
+  ) {
+    return "OpenAI API 额度不足，请检查 Billing。";
+  }
+
+  if (normalized.includes("invalid_api_key") || normalized.includes("401") || normalized.includes("unauthorized")) {
+    return "AI API Key 无效，请检查当前模型供应商的 API Key 配置。";
+  }
+
+  if (normalized.includes("model_not_found") || normalized.includes("model not found")) {
+    return "当前大模型不可用，请检查模型名称和供应商配置。";
+  }
 
   if (message === "OPENAI_API_KEY is not configured.") {
     return "OPENAI_API_KEY 未配置，无法调用真实大模型。请在项目 .env 中配置 OPENAI_API_KEY。";
@@ -1417,11 +1448,6 @@ async function handleUpdateInventoryAction(req, res, reportId, actionId) {
 
 async function handleRequest(req, res) {
   const requestUrl = new URL(req.url, `http://${req.headers.host}`);
-
-  if (requestUrl.pathname === "/app" && !(await getSessionContext(req))) {
-    sendRedirect(res, "/?auth=required");
-    return;
-  }
 
   if (requestUrl.pathname === "/api/health") {
     const database = await getDatabaseStatus();
