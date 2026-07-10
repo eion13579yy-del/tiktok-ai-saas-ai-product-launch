@@ -16,6 +16,7 @@ const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
 const dataFile = path.resolve(rootDir, process.env.DATA_FILE || "data/db.json");
 const sessionCookieName = "aplo_session";
+const deviceCookieName = "aplo_device";
 let dbWriteQueue = Promise.resolve();
 
 const emptyDb = {
@@ -410,14 +411,26 @@ function parseCookies(req) {
 }
 
 function setSessionCookie(res, token) {
-  res.setHeader(
-    "Set-Cookie",
-    `${sessionCookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`
-  );
+  appendCookie(res, `${sessionCookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`);
+}
+
+function setDeviceCookie(res, deviceId) {
+  appendCookie(res, `${deviceCookieName}=${encodeURIComponent(deviceId)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=31536000`);
 }
 
 function clearSessionCookie(res) {
-  res.setHeader("Set-Cookie", `${sessionCookieName}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`);
+  appendCookie(res, `${sessionCookieName}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`);
+}
+
+function appendCookie(res, cookie) {
+  const current = res.getHeader("Set-Cookie");
+
+  if (!current) {
+    res.setHeader("Set-Cookie", cookie);
+    return;
+  }
+
+  res.setHeader("Set-Cookie", Array.isArray(current) ? [...current, cookie] : [current, cookie]);
 }
 
 async function readRequestBody(req) {
@@ -474,14 +487,57 @@ async function getSessionContext(req) {
 }
 
 async function requireSession(req, res) {
-  const context = await getSessionContext(req);
+  let context = await getSessionContext(req);
 
   if (!context) {
-    sendUnauthorized(res);
-    return null;
+    context = await createGuestSessionContext(req, res);
   }
 
   return context;
+}
+
+async function createGuestSessionContext(req, res) {
+  const db = await readDb();
+  const timestamp = new Date().toISOString();
+  const cookies = parseCookies(req);
+  const rawDeviceId = String(cookies[deviceCookieName] || "").trim();
+  const deviceId = /^[a-f0-9-]{36}$/i.test(rawDeviceId) ? rawDeviceId : randomUUID();
+  const guestEmail = `guest-${deviceId}@ai-product-launch-os.local`;
+  let user = db.users.find((item) => item.email === guestEmail);
+
+  if (!user) {
+    user = {
+      id: randomUUID(),
+      name: "AI Product Launch User",
+      email: guestEmail,
+      passwordHash: "",
+      role: "seller",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    db.users.push(user);
+  }
+
+  let membership = db.workspaceMembers.find((item) => item.userId === user.id && item.status === "active");
+  let workspace = db.workspaces.find((item) => item.id === membership?.workspaceId);
+
+  if (!workspace) {
+    workspace = createDefaultWorkspace(db, user, "AI Product Launch OS 工作台");
+    membership = db.workspaceMembers.find((item) => item.workspaceId === workspace.id && item.userId === user.id);
+  }
+
+  const session = createSession(db, user);
+  await writeDb(db);
+  setDeviceCookie(res, deviceId);
+  setSessionCookie(res, session.token);
+
+  return {
+    db,
+    session,
+    user,
+    workspace,
+    membership
+  };
 }
 
 function createDefaultWorkspace(db, user, workspaceName) {

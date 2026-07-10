@@ -2131,7 +2131,7 @@ async function generateLaunchReport() {
 function showApp(payload) {
   authView.classList.add("hidden");
   appView.classList.remove("hidden");
-  logoutButton.classList.remove("hidden");
+  logoutButton.classList.add("hidden");
 
   workspaceTitle.textContent = payload.workspace?.name || "打品工作台";
   workspaceSubtitle.textContent = `${payload.user.name} - ${payload.user.email} - ${payload.workspace?.plan || "free"} 方案`;
@@ -2150,8 +2150,10 @@ async function refreshSession() {
   try {
     const payload = await requestJson("/api/auth/me");
     showApp(payload);
-  } catch {
-    showAuth();
+  } catch (error) {
+    authView.classList.add("hidden");
+    statusRow.classList.add("is-error");
+    statusText.textContent = `系统暂时无法进入工作台：${error.message}`;
   }
 }
 
