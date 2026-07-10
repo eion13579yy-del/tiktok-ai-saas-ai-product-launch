@@ -511,6 +511,12 @@ h1 {
   min-height: 160px;
 }
 
+.report-card-action {
+  width: fit-content;
+  min-width: 112px;
+  margin-top: 12px;
+}
+
 .report-sections {
   display: grid;
   gap: 12px;

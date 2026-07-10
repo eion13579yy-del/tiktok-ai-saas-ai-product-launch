@@ -188,6 +188,17 @@ function safeFileName(value) {
     .slice(0, 80);
 }
 
+function scoreToPercent(value, fallback = "待评估") {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  const normalized = number > 0 && number <= 10 ? number * 10 : number;
+  return String(Math.max(0, Math.min(100, Math.round(normalized))));
+}
+
 function mapApiError(message, status) {
   const normalized = String(message || "").toLowerCase();
 
@@ -442,6 +453,7 @@ function renderLaunchReport(payload) {
 function renderLaunchReportV2(payload) {
   const report = payload.report;
   const project = payload.project;
+  const burstProbability = scoreToPercent(report.productEvaluationModel?.totalScore ?? report.opportunityScore);
   activeReport = report;
   activeProject = project || activeProject;
   ensureDownloadReportButton();
@@ -467,11 +479,12 @@ function renderLaunchReportV2(payload) {
     </article>
     <article>
       <span>智能评估结论</span>
-      <strong>爆款概率 ${escapeHtml(report.productEvaluationModel?.totalScore ?? report.opportunityScore ?? "待评估")} / 100</strong>
+      <strong>爆款概率 ${escapeHtml(burstProbability)} / 100</strong>
       <p>数据可信度：${escapeHtml(report.dataCredibilityScore ?? "未评分")} / 100</p>
-      <p>可导出 PDF</p>
+      <button class="primary-action report-card-action" type="button" data-export-report-pdf>导出 PDF</button>
     </article>
   `;
+  reportSummary.querySelector("[data-export-report-pdf]")?.addEventListener("click", exportActiveReportPdf);
   renderReportModules(report.sections || [], report.sections?.[0]?.type);
 }
 
@@ -536,6 +549,7 @@ function scoreDimensionLabel(key) {
 
 function renderEvaluationLayer(report) {
   const model = report.productEvaluationModel;
+  const burstProbability = scoreToPercent(model?.totalScore ?? report.opportunityScore);
   const scoreInsight =
     model?.scoreInsight ||
     report.aiEngine?.scoreInsight ||
@@ -550,7 +564,7 @@ function renderEvaluationLayer(report) {
       <div class="evaluation-header">
         <div>
           <span>智能评估结论</span>
-          <h3>爆款概率 ${escapeHtml(model.totalScore ?? report.opportunityScore ?? "待评估")} / 100</h3>
+          <h3>爆款概率 ${escapeHtml(burstProbability)} / 100</h3>
           <p>${escapeHtml(scoreInsight)}</p>
         </div>
         <div class="evaluation-score">
