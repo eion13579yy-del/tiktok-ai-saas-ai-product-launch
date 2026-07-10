@@ -845,9 +845,11 @@ function renderReportModulesV3(sections, activeType) {
     .map(
       (module, index) => `
         <button class="module-nav-item ${module.type === activeModule.type ? "is-active" : ""}" type="button" data-section-type="${escapeHtml(module.type)}">
-          <span>${String(index + 1).padStart(2, "0")}</span>
-          <strong>${escapeHtml(module.title)}</strong>
-          <small>${escapeHtml(module.subtitle)}</small>
+          <span class="nav-number">${String(index + 1).padStart(2, "0")}</span>
+          <span class="nav-title-group">
+            <strong class="nav-title-cn">${escapeHtml(module.title)}</strong>
+            <small class="nav-title-en">${escapeHtml(module.subtitle)}</small>
+          </span>
         </button>
       `
     )
@@ -872,8 +874,10 @@ function renderReportModules(sections, activeType) {
     .map(
       (section, index) => `
         <button class="module-nav-item ${section.type === activeSection?.type ? "is-active" : ""}" type="button" data-section-type="${escapeHtml(section.type)}">
-          <span>${String(index + 1).padStart(2, "0")}</span>
-          ${escapeHtml(moduleLabel(section.type))}
+          <span class="nav-number">${String(index + 1).padStart(2, "0")}</span>
+          <span class="nav-title-group">
+            <strong class="nav-title-cn">${escapeHtml(moduleLabel(section.type))}</strong>
+          </span>
         </button>
       `
     )

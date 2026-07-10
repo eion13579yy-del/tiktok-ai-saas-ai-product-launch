@@ -528,7 +528,7 @@ h1 {
 
 .report-workspace {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   gap: 14px;
   margin-top: 14px;
 }
@@ -537,6 +537,9 @@ h1 {
   display: grid;
   gap: 8px;
   align-content: start;
+  width: 320px;
+  min-width: 320px;
+  overflow-x: hidden;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -544,12 +547,11 @@ h1 {
 }
 
 .module-nav-item {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 0 10px;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--muted);
@@ -560,9 +562,36 @@ h1 {
   cursor: pointer;
 }
 
-.module-nav-item span {
+.nav-number {
+  flex: 0 0 28px;
   margin: 0;
   color: var(--accent);
+}
+
+.nav-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nav-title-cn,
+.nav-title-en {
+  display: inline-block;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  line-height: 1.25;
+}
+
+.nav-title-cn {
+  color: inherit;
+}
+
+.nav-title-en {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .module-nav-item.is-active {
@@ -594,8 +623,6 @@ h1 {
 
 .evaluation-header *,
 .evaluation-score *,
-.module-nav-item,
-.module-nav-item *,
 .module-item-grid article,
 .module-item-grid article *,
 .module-table *,
@@ -790,24 +817,6 @@ h1 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-}
-
-.module-nav-item {
-  align-items: flex-start;
-}
-
-.module-nav-item strong,
-.module-nav-item small {
-  display: block;
-  text-align: left;
-  line-height: 1.25;
-}
-
-.module-nav-item small {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .confidence-pill {
@@ -1690,6 +1699,15 @@ article p {
     flex-direction: row;
     overflow-x: auto;
     position: static;
+  }
+
+  .report-module-nav {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .nav-title-en {
+    display: none;
   }
 
   .metric-grid,
