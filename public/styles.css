@@ -68,7 +68,6 @@
 .executive-hero,
 .metric-card-viz,
 .chart-card,
-.visual-aside,
 .report-page-card {
   border: 1px solid var(--report-line);
   border-radius: 8px;
@@ -89,7 +88,6 @@
 }
 
 .mode-tabs button,
-.visual-aside button,
 .chart-actions button {
   min-height: 36px;
   border: 1px solid var(--report-line);
@@ -106,7 +104,7 @@
 }
 
 .mode-tabs button.is-active,
-.visual-aside button.is-active {
+.chart-actions button.is-active {
   color: var(--report-ink);
   border-color: var(--report-accent);
   background: color-mix(in srgb, var(--report-accent) 13%, transparent);
@@ -131,7 +129,7 @@
 
 .executive-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   padding: 22px;
 }
@@ -202,10 +200,16 @@
   gap: 8px;
 }
 
+.hero-actions .primary-action {
+  width: auto;
+  min-width: 112px;
+  white-space: nowrap;
+}
+
 .decision-banner {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr)) 118px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--report-line);
@@ -239,7 +243,9 @@
   --score: 0;
   display: grid;
   place-items: center;
+  width: 112px;
   min-height: 92px;
+  justify-self: end;
   border-radius: 999px;
   background:
     radial-gradient(circle at center, var(--report-card) 54%, transparent 55%),
@@ -278,7 +284,7 @@
 
 .visual-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -502,31 +508,6 @@
   text-align: center;
 }
 
-.visual-aside {
-  position: sticky;
-  top: 18px;
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-}
-
-.visual-aside h3 {
-  margin: 0 0 6px;
-}
-
-.visual-aside button {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 44px;
-  gap: 8px;
-  align-items: center;
-  padding: 10px;
-  text-align: left;
-}
-
-.visual-aside small {
-  text-align: right;
-}
-
 .risk-dot-card {
   margin-top: 8px;
   padding: 12px;
@@ -572,8 +553,21 @@
     grid-template-columns: 1fr;
   }
 
-  .visual-aside {
-    position: static;
+}
+
+@media (max-width: 1100px) {
+  .workspace-panel:has(#report-panel:not(.hidden)) .app-layout {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+
+  #report-panel .report-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  #report-panel .report-module-nav {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -637,6 +631,14 @@ body {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.workspace-panel:has(#report-panel:not(.hidden)) {
+  width: min(1500px, calc(100vw - 48px));
+}
+
+.workspace-panel:has(#report-panel:not(.hidden)) .app-layout {
+  grid-template-columns: 200px minmax(0, 1fr);
 }
 
 .topbar {
@@ -1184,7 +1186,7 @@ h1 {
 
 .report-workspace {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 14px;
   margin-top: 14px;
 }
@@ -1193,8 +1195,8 @@ h1 {
   display: grid;
   gap: 8px;
   align-content: start;
-  width: 320px;
-  min-width: 320px;
+  width: 300px;
+  min-width: 300px;
   overflow-x: hidden;
   padding: 12px;
   border: 1px solid var(--line);

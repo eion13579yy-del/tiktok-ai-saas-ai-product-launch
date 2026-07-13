@@ -44,6 +44,15 @@ let activeReportMode = "dashboard";
 let activeReportTheme = "executive-orange";
 const PROJECT_DRAFT_KEY = "ai_product_launch_project_draft";
 
+const REPORT_REVIEW_MODES = [
+  ["dashboard", "驾驶舱"],
+  ["report", "完整报告"],
+  ["finance", "财务测算"],
+  ["planning", "年度计划"],
+  ["evidence", "数据证据"],
+  ["risk", "风险中心"]
+];
+
 const LAUNCH_MODULES = [
   {
     type: "market_intelligence",
@@ -483,10 +492,8 @@ function renderLaunchReportV2(payload) {
       <span>智能评估结论</span>
       <strong>爆款概率 ${escapeHtml(burstProbability)} / 100</strong>
       <p>数据可信度：${escapeHtml(report.dataCredibilityScore ?? "未评分")} / 100</p>
-      <button class="primary-action report-card-action" type="button" data-export-report-pdf>导出 PDF</button>
     </article>
   `;
-  reportSummary.querySelector("[data-export-report-pdf]")?.addEventListener("click", exportActiveReportPdf);
   renderReportModules(report.sections || [], report.sections?.[0]?.type);
 }
 
@@ -506,9 +513,6 @@ function ensureDownloadReportButton() {
   downloadReportButton.className = "export-actions";
   downloadReportButton.innerHTML = `
     <button class="primary-action" type="button" data-export-report-file="pdf">导出 PDF</button>
-    <button class="ghost-button" type="button" data-export-report-file="docx">DOCX</button>
-    <button class="ghost-button" type="button" data-export-report-file="xlsx">XLSX</button>
-    <button class="ghost-button" type="button" data-export-report-file="json">JSON</button>
   `;
   downloadReportButton.querySelectorAll("[data-export-report-file]").forEach((button) => {
     button.addEventListener("click", () => exportActiveReportFile(button.dataset.exportReportFile));
@@ -603,19 +607,10 @@ function renderReportModeToolbar(report) {
     { id: "corporate-navy", name: "Corporate Navy" },
     { id: "minimal-dark", name: "Minimal Dark" }
   ];
-  const modes = [
-    ["dashboard", "驾驶舱"],
-    ["report", "完整报告"],
-    ["finance", "财务测算"],
-    ["planning", "年度计划"],
-    ["evidence", "数据证据"],
-    ["risk", "风险中心"]
-  ];
-
   return `
     <div class="report-mode-toolbar">
       <div class="mode-tabs" role="tablist" aria-label="报告模式">
-        ${modes
+        ${REPORT_REVIEW_MODES
           .map(
             ([mode, label]) => `
               <button type="button" class="${activeReportMode === mode ? "is-active" : ""}" data-report-mode="${mode}" aria-label="切换到${label}">
@@ -658,12 +653,6 @@ function renderExecutiveHeader(project, report) {
             <span>v${escapeHtml(report.version || 1)}</span>
           </div>
         </div>
-      </div>
-      <div class="hero-actions">
-        <button class="ghost-button" type="button" data-report-mode="finance" aria-label="编辑参数">编辑参数</button>
-        <button class="ghost-button" type="button" id="hero-regenerate-report" aria-label="重新分析">重新分析</button>
-        <button class="ghost-button" type="button" data-export-report-file="json" aria-label="保存版本">保存版本</button>
-        <button class="primary-action" type="button" data-export-report-file="pdf" aria-label="导出报告">导出报告</button>
       </div>
       <article class="decision-banner">
         <div>
@@ -938,7 +927,6 @@ function chartsByMode(report, mode) {
 
 function renderExecutiveDashboard(report) {
   const charts = chartsByMode(report, activeReportMode);
-  const pages = reportViz(report)?.pages || [];
 
   return `
     <div class="executive-report-shell report-theme-${escapeHtml(activeReportTheme)}">
@@ -951,24 +939,6 @@ function renderExecutiveDashboard(report) {
           ${activeReportMode === "report" ? renderLegacyReportModuleStack(report) : ""}
           ${activeReportMode === "evidence" ? renderP2ExportVersionPanel(report) : ""}
         </div>
-        <aside class="visual-aside">
-          <h3>章节导航</h3>
-          ${pages
-            .map(
-              (page) => `
-                <button type="button" class="${page.mode === activeReportMode ? "is-active" : ""}" data-report-mode="${escapeHtml(page.mode)}">
-                  <span>${escapeHtml(page.number)}</span>
-                  <strong>${escapeHtml(page.title)}</strong>
-                  <small>${escapeHtml(page.completion)}%</small>
-                </button>
-              `
-            )
-            .join("")}
-          <div class="risk-dot-card">
-            <strong>待确认数据</strong>
-            <p>${escapeHtml(report.validationChecklist?.length || report.consistencyChecks?.length || 0)} 项需要运营复核</p>
-          </div>
-        </aside>
       </section>
     </div>
   `;
@@ -1064,12 +1034,6 @@ function renderP2ExportVersionPanel(report) {
         <div>
           <span>Export & Version</span>
           <h3>导出、版本和外部数据接口</h3>
-        </div>
-        <div class="export-actions">
-          <button class="primary-action" type="button" data-export-report-file="pdf">导出 PDF</button>
-          <button class="ghost-button" type="button" data-export-report-file="docx">DOCX</button>
-          <button class="ghost-button" type="button" data-export-report-file="xlsx">XLSX</button>
-          <button class="ghost-button" type="button" data-export-report-file="json">JSON</button>
         </div>
       </div>
       <div class="module-table">
@@ -1398,14 +1362,13 @@ function setupProjectDraftPersistence() {
 
 function renderReportModulesV3(sections, activeType) {
   if (reportViz(activeReport)) {
-    reportModuleNav.innerHTML = (reportViz(activeReport).pages || [])
+    reportModuleNav.innerHTML = REPORT_REVIEW_MODES
       .map(
-        (page) => `
-          <button class="module-nav-item ${page.mode === activeReportMode ? "is-active" : ""}" type="button" data-report-mode="${escapeHtml(page.mode)}">
-            <span class="nav-number">${escapeHtml(page.number)}</span>
+        ([mode, label], index) => `
+          <button class="module-nav-item ${mode === activeReportMode ? "is-active" : ""}" type="button" data-report-mode="${escapeHtml(mode)}">
+            <span class="nav-number">${String(index + 1).padStart(2, "0")}</span>
             <span class="nav-title-group">
-              <strong class="nav-title-cn">${escapeHtml(page.title)}</strong>
-              <small class="nav-title-en">${escapeHtml(page.completion)}% 完成</small>
+              <strong class="nav-title-cn">${escapeHtml(label)}</strong>
             </span>
           </button>
         `
