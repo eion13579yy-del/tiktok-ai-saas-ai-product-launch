@@ -1,4 +1,4 @@
-import http from "node:http";
+﻿import http from "node:http";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -6,6 +6,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateLaunchReportContent, generateReportSectionContent } from "./ai.js";
 import { openAiConfigStatus } from "./env.js";
+import { calculateFinancialModel } from "../src/domain/financial-engine.js";
+import { buildDecisionDashboard } from "../src/domain/decision-engine.js";
+import { runConsistencyChecks } from "../src/domain/consistency-check.js";
+import { flattenProjectFromStructuredInput, normalizeStructuredInput } from "../src/domain/project-input.js";
+import { buildOperatingPlan } from "../src/domain/operating-engine.js";
+import { buildDocx, buildExportPayload, buildXlsx } from "../src/domain/export-engine.js";
+import { buildVisualizationReport } from "../src/domain/visualization-report.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,6 +131,16 @@ function sendPdf(res, filename, buffer) {
   res.end(buffer);
 }
 
+function sendDownload(res, contentType, filename, buffer) {
+  res.writeHead(200, {
+    "Content-Type": contentType,
+    "Content-Disposition": `attachment; filename="${filename}"`,
+    "Content-Length": buffer.length,
+    "Cache-Control": "no-store"
+  });
+  res.end(buffer);
+}
+
 function sendRedirect(res, location) {
   res.writeHead(302, {
     Location: location
@@ -223,13 +240,14 @@ function publicProductProject(project) {
     id: project.id,
     productName: project.productName,
     category: project.category || "Uncategorized",
-    targetMarket: project.targetMarket || "美国",
+    targetMarket: project.targetMarket || "缇庡浗",
     platforms: project.platforms || [],
     competitorLinks: project.competitorLinks || [],
     targetPrice: project.targetPrice ?? null,
     costPrice: project.costPrice ?? null,
     inventory: project.inventory ?? null,
     leadTimeDays: project.leadTimeDays ?? null,
+    structuredInput: project.structuredInput || null,
     status: project.status || "draft",
     opportunityScore: project.opportunityScore ?? null,
     riskLevel: project.riskLevel || "unknown",
@@ -254,6 +272,18 @@ function publicLaunchReport(report) {
     dataCredibilityScore: report.dataCredibilityScore ?? null,
     dataSourceBreakdown: report.dataSourceBreakdown || null,
     productEvaluationModel: report.productEvaluationModel || null,
+    decisionDashboard: report.decisionDashboard || null,
+    financialModel: report.financialModel || null,
+    consistencyChecks: report.consistencyChecks || [],
+    dataSourceMap: report.dataSourceMap || null,
+    scenarioSimulation: report.scenarioSimulation || null,
+    annualPlan: report.annualPlan || null,
+    channelBreakdown: report.channelBreakdown || null,
+    gateDecision: report.gateDecision || null,
+    riskRegister: report.riskRegister || null,
+    visualizationReport: report.visualizationReport || null,
+    parameterSnapshot: report.parameterSnapshot || null,
+    changeLog: report.changeLog || [],
     roleReviews: report.roleReviews || [],
     validationChecklist: report.validationChecklist || [],
     factSafetyRule: report.factSafetyRule || null,
@@ -279,7 +309,7 @@ function parseOptionalNumber(value) {
 }
 
 function normalizePlatforms(platforms) {
-  const allowed = new Set(["TikTok", "Amazon", "Walmart"]);
+  const allowed = new Set(["TikTok", "Amazon", "Walmart", "DTC", "TikTok Shop"]);
   const values = Array.isArray(platforms) ? platforms : [];
 
   return [...new Set(values.map((platform) => String(platform).trim()).filter((platform) => allowed.has(platform)))];
@@ -825,8 +855,15 @@ async function handleCreateProductProject(req, res) {
   }
 
   const body = await readRequestBody(req);
-  const productName = String(body.productName || "").trim();
-  const platforms = normalizePlatforms(body.platforms);
+  body.targetPlatforms ||= body.platforms;
+  body.targetCountry ||= body.targetMarket;
+  body.factoryPrice ||= body.costPrice;
+  body.currentInventory ||= body.inventory;
+  body.productionLeadTimeDays ||= body.leadTimeDays;
+  const structuredInput = normalizeStructuredInput(body);
+  const flattenedProject = flattenProjectFromStructuredInput(structuredInput);
+  const productName = String(flattenedProject.productName || body.productName || "").trim();
+  const platforms = normalizePlatforms(flattenedProject.platforms.length ? flattenedProject.platforms : body.platforms);
 
   if (!productName) {
     sendValidationError(res, "Product name is required.");
@@ -843,14 +880,15 @@ async function handleCreateProductProject(req, res) {
     id: randomUUID(),
     workspaceId: context.workspace.id,
     productName,
-    category: String(body.category || "").trim() || "Uncategorized",
-    targetMarket: String(body.targetMarket || "").trim() || "美国",
+    category: String(flattenedProject.category || body.category || "").trim() || "Uncategorized",
+    targetMarket: String(flattenedProject.targetMarket || body.targetMarket || "").trim() || "美国",
     platforms,
-    competitorLinks: normalizeCompetitorLinks(body.competitorLinks),
-    targetPrice: parseOptionalNumber(body.targetPrice),
-    costPrice: parseOptionalNumber(body.costPrice),
-    inventory: parseOptionalNumber(body.inventory),
-    leadTimeDays: parseOptionalNumber(body.leadTimeDays),
+    competitorLinks: normalizeCompetitorLinks(flattenedProject.competitorLinks.length ? flattenedProject.competitorLinks : body.competitorLinks),
+    targetPrice: parseOptionalNumber(flattenedProject.targetPrice ?? body.targetPrice),
+    costPrice: parseOptionalNumber(flattenedProject.costPrice ?? body.costPrice),
+    inventory: parseOptionalNumber(flattenedProject.inventory ?? body.inventory),
+    leadTimeDays: parseOptionalNumber(flattenedProject.leadTimeDays ?? body.leadTimeDays),
+    structuredInput,
     status: "draft",
     opportunityScore: null,
     riskLevel: "unknown",
@@ -922,34 +960,6 @@ function formatAiGenerationError(error) {
     return "当前大模型不可用，请检查模型名称和供应商配置。";
   }
 
-  if (message === "OPENAI_API_KEY is not configured.") {
-    return "OPENAI_API_KEY 未配置，无法调用真实大模型。请在项目 .env 中配置 OPENAI_API_KEY。";
-  }
-
-  if (message === "DEEPSEEK_API_KEY is not configured.") {
-    return "DEEPSEEK_API_KEY 未配置，无法调用 DeepSeek 大模型。请在项目 .env 中配置 DEEPSEEK_API_KEY。";
-  }
-
-  if (message.includes("insufficient_quota")) {
-    return "大模型 API 已接通，但当前账号额度不足或账单不可用。请在对应平台检查充值、账单和项目额度。";
-  }
-
-  if (message.includes("402") || message.includes("需要付款") || message.includes("Payment Required")) {
-    return "大模型 API 已接通，但当前账号余额不足或计费未开通。请在对应平台完成充值或开通计费后重试。";
-  }
-
-  if (message.includes("429") || message.includes("Too Many Requests")) {
-    return "大模型 API 已接通，但当前账号触发额度或频率限制。请检查平台账单、项目额度和速率限制后重试。";
-  }
-
-  if (message.includes("invalid_api_key") || message.includes("401") || message.includes("Unauthorized")) {
-    return "大模型 API Key 无效。请检查 .env 中当前供应商的 API Key 是否正确。";
-  }
-
-  if (message.includes("model_not_found")) {
-    return "当前大模型不可用。请检查 .env 中当前供应商的模型配置。";
-  }
-
   return message;
 }
 
@@ -974,8 +984,14 @@ async function handleGenerateLaunchReport(req, res, projectId) {
   const version = context.db.launchReports.filter((report) => report.projectId === project.id).length + 1;
   let generated;
 
+  const reportProject = {
+    ...project,
+    structuredInput: project.structuredInput || normalizeStructuredInput(project)
+  };
+  const financialModel = calculateFinancialModel(reportProject.structuredInput);
+
   try {
-    generated = await generateLaunchReportContent(project, {
+    generated = await generateLaunchReportContent(reportProject, {
       generationMode: body.generationMode || "auto"
     });
   } catch (error) {
@@ -986,12 +1002,35 @@ async function handleGenerateLaunchReport(req, res, projectId) {
     return;
   }
 
+  const consistencyChecks = runConsistencyChecks(reportProject.structuredInput, financialModel);
+  const decisionDashboard = buildDecisionDashboard(project, reportProject.structuredInput, financialModel, generated, consistencyChecks);
+  const operatingPlan = buildOperatingPlan(reportProject.structuredInput, financialModel, generated);
+  const reportBase = {
+    ...generated,
+    financialModel,
+    decisionDashboard,
+    consistencyChecks,
+    dataSourceMap: reportProject.structuredInput,
+    ...operatingPlan
+  };
   const report = {
     id: randomUUID(),
     workspaceId: context.workspace.id,
     projectId: project.id,
     version,
-    ...generated,
+    ...reportBase,
+    visualizationReport: buildVisualizationReport(project, { ...reportBase, version, generatedAt: timestamp }, { timestamp }),
+    parameterSnapshot: reportProject.structuredInput,
+    changeLog: [
+      {
+        version,
+        action: version === 1 ? "created" : "regenerated",
+        note: "Report generated from structured input, formula engine, operating plan, and AI analysis.",
+        createdAt: timestamp
+      }
+    ],
+    opportunityScore: decisionDashboard.weightedScore,
+    riskLevel: decisionDashboard.recommendationGrade === "D" ? "high" : decisionDashboard.recommendationGrade === "C" ? "medium" : generated.riskLevel,
     generatedAt: timestamp,
     createdAt: timestamp,
     updatedAt: timestamp
@@ -1055,10 +1094,103 @@ async function handleGetLaunchReport(req, res, reportId) {
   }
 
   const project = context.db.productProjects.find((item) => item.id === report.projectId);
+  const publicReport = {
+    ...report,
+    visualizationReport: report.visualizationReport || buildVisualizationReport(project, report, { timestamp: report.updatedAt || report.generatedAt })
+  };
 
   sendJson(res, 200, {
-    report: publicLaunchReport(report),
+    report: publicLaunchReport(publicReport),
     project: project ? publicProductProject(project) : null
+  });
+}
+
+async function handleListProjectReportVersions(req, res, projectId) {
+  const context = await requireSession(req, res);
+
+  if (!context) {
+    return;
+  }
+
+  const project = context.db.productProjects.find(
+    (item) => item.id === projectId && item.workspaceId === context.workspace?.id
+  );
+
+  if (!project) {
+    sendNotFound(res);
+    return;
+  }
+
+  const versions = context.db.launchReports
+    .filter((report) => report.projectId === project.id && report.workspaceId === context.workspace?.id)
+    .sort((a, b) => Number(b.version || 0) - Number(a.version || 0))
+    .map((report) => ({
+      id: report.id,
+      version: report.version,
+      status: report.status,
+      recommendationGrade: report.decisionDashboard?.recommendationGrade || null,
+      suggestedAction: report.decisionDashboard?.suggestedAction || null,
+      weightedScore: report.decisionDashboard?.weightedScore ?? report.opportunityScore,
+      generatedAt: report.generatedAt,
+      changeLog: report.changeLog || []
+    }));
+
+  sendJson(res, 200, {
+    project: publicProductProject(project),
+    versions
+  });
+}
+
+async function handleCompareProjectReports(req, res) {
+  const context = await requireSession(req, res);
+
+  if (!context) {
+    return;
+  }
+
+  const projects = context.db.productProjects
+    .filter((project) => project.workspaceId === context.workspace?.id)
+    .map((project) => {
+      const report = context.db.launchReports
+        .filter((item) => item.projectId === project.id && item.workspaceId === context.workspace?.id)
+        .sort((a, b) => Number(b.version || 0) - Number(a.version || 0))[0];
+
+      return {
+        id: project.id,
+        productName: project.productName,
+        category: project.category,
+        targetMarket: project.targetMarket,
+        platforms: project.platforms || [],
+        latestReportId: report?.id || null,
+        version: report?.version || null,
+        recommendationGrade: report?.decisionDashboard?.recommendationGrade || null,
+        suggestedAction: report?.decisionDashboard?.suggestedAction || null,
+        weightedScore: report?.decisionDashboard?.weightedScore ?? report?.opportunityScore ?? null,
+        baseNetMargin: report?.decisionDashboard?.baseNetMargin || null,
+        breakEvenRoas: report?.decisionDashboard?.breakEvenRoas || null,
+        biggestRisk: report?.decisionDashboard?.biggestRisk || null,
+        dataGap: report?.decisionDashboard?.biggestDataGap || null
+      };
+    })
+    .sort((a, b) => Number(b.weightedScore || 0) - Number(a.weightedScore || 0));
+
+  sendJson(res, 200, {
+    projects
+  });
+}
+
+async function handleExternalDataStatus(req, res) {
+  await requireSession(req, res);
+
+  sendJson(res, 200, {
+    connectors: [
+      { key: "google_trends", name: "Google Trends", status: "not_connected", use: "趋势、季节性、搜索兴趣" },
+      { key: "amazon", name: "Amazon Marketplace", status: "not_connected", use: "竞品、评论、价格、销量估算" },
+      { key: "tiktok_shop", name: "TikTok Shop", status: "not_connected", use: "达人、内容、GMV、直播数据" },
+      { key: "walmart", name: "Walmart Marketplace", status: "not_connected", use: "竞品、价格、类目承接" },
+      { key: "review_sources", name: "Review Sources", status: "not_connected", use: "Amazon/TikTok/Reddit/YouTube 评论分析" }
+    ],
+    rule: "未连接外部接口时，报告中的外部数据必须显示为待验证或AI估算，不能写成确定事实。"
   });
 }
 
@@ -1079,57 +1211,99 @@ async function handleDownloadLaunchReportPdf(req, res, reportId) {
   }
 
   const project = context.db.productProjects.find((item) => item.id === report.projectId);
-  const rawProfile = report.productProfile || {};
-  const profile = {
-    ...rawProfile,
-    categoryAttributes:
-      rawProfile.categoryAttributes || [rawProfile.productCategory, rawProfile.lifecycle].filter(Boolean),
-    targetAudience:
-      rawProfile.targetAudience || (rawProfile.consumerSegments || []).filter(Boolean).join("; "),
-    returnRisk: rawProfile.returnRisk || rawProfile.afterSalesRisk || "",
-    contentPropagationPoints: rawProfile.contentPropagationPoints || rawProfile.contentViralityAttributes || [],
-    platformComplianceRisk: rawProfile.platformComplianceRisk || rawProfile.complianceRisk || "",
-    decisionFactors: rawProfile.decisionFactors || []
-  };
-  const finalConclusion = report.differentiationAnalysis?.finalConclusion || {};
-  const differentiationScores = report.differentiationAnalysis?.scores || [];
+  const dashboard = report.decisionDashboard || {};
+  const financial = report.financialModel?.formulas || {};
   const lines = [
     `产品：${project?.productName || report.projectId}`,
     `目标市场：${project?.targetMarket || ""}`,
     `平台：${(project?.platforms || []).join(", ")}`,
-    `目标售价：${project?.targetPrice ?? ""}`,
-    `成本：${project?.costPrice ?? ""}`,
-    `竞品链接：${(project?.competitorLinks || []).join(" | ") || "未填写"}`,
+    `目标售价：${project?.targetPrice ?? "待确认"}`,
+    `出厂价：${project?.costPrice ?? "待确认"}`,
+    `竞品链接：${(project?.competitorLinks || []).join(" | ") || "未提供"}`,
     "",
-    "Product Profile",
-    `品类属性：${(profile.categoryAttributes || []).join("；")}`,
-    `使用场景：${(profile.useScenarios || []).join("；")}`,
-    `目标人群：${profile.targetAudience || ""}`,
-    `价格带：${profile.priceBand || ""}`,
-    `决策因素：${(profile.decisionFactors || []).join("；")}`,
-    `退货风险：${profile.returnRisk || ""}`,
-    `内容传播点：${(profile.contentPropagationPoints || []).join("；")}`,
-    `平台合规风险：${profile.platformComplianceRisk || ""}`,
+    "最终决策驾驶舱",
+    `项目推荐等级：${dashboard.recommendationGrade || "待确认"}`,
+    `建议动作：${dashboard.suggestedAction || "待确认"}`,
+    `建议首批备货量：${dashboard.suggestedFirstBatchInventory || "待确认"}`,
+    `建议测试预算：${dashboard.suggestedTestBudget || "待确认"}`,
+    `基准净利润率：${dashboard.baseNetMargin || "待确认"}`,
+    `盈亏平衡ROAS：${dashboard.breakEvenRoas || "待确认"}`,
+    `最大风险：${dashboard.biggestRisk || "待确认"}`,
+    `下一步验证动作：${dashboard.nextValidationAction || "待确认"}`,
     "",
-    "差异化评分",
-    ...differentiationScores.map((score) => `${score.label}：${score.value} - ${score.reason}`),
-    "",
-    "最终结论",
-    `是否值得测：${finalConclusion.worthTesting || ""}`,
-    `建议首批备货：${finalConclusion.firstBatchInventory || ""}`,
-    `测品周期：${finalConclusion.testingCycle || ""}`,
-    `达人打法：${finalConclusion.creatorStrategy || ""}`,
-    `短视频方向：${finalConclusion.shortVideoDirection || ""}`,
-    `直播方向：${finalConclusion.liveDirection || ""}`,
-    `最大风险：${finalConclusion.biggestRisk || ""}`,
+    "财务公式结果",
+    `单台落地成本：${financial.landedCost ?? "待确认"}`,
+    `单台出仓成本：${financial.fulfillmentCost ?? "待确认"}`,
+    `单台完整成本：${financial.totalCostPerUnit ?? "待确认"}`,
+    `单台净利润：${financial.netProfitPerUnit ?? "待确认"}`,
+    `首批备货现金需求：${financial.firstBatchCashNeed ?? "待确认"}`,
     "",
     `报告摘要：${report.summary || ""}`,
     `建议：${report.recommendation || ""}`
   ];
-  const buffer = buildSimplePdf(`${project?.productName || "launch-report"} - 产品差异化分析报告`, lines);
+  const buffer = buildSimplePdf(`${project?.productName || "launch-report"} - AI Product Launch Report`, lines);
   const filename = `launch-report-${report.id}.pdf`;
 
   sendPdf(res, filename, buffer);
+}
+
+async function handleExportLaunchReport(req, res, reportId, format) {
+  const context = await requireSession(req, res);
+
+  if (!context) {
+    return;
+  }
+
+  const report = context.db.launchReports.find(
+    (item) => item.id === reportId && item.workspaceId === context.workspace?.id
+  );
+
+  if (!report) {
+    sendNotFound(res);
+    return;
+  }
+
+  const project = context.db.productProjects.find((item) => item.id === report.projectId);
+  const safeName = safeDownloadName(project?.productName || "AI_Product_Launch_Report");
+
+  if (format === "json") {
+    const payload = buildExportPayload(project ? publicProductProject(project) : null, publicLaunchReport(report));
+    const buffer = Buffer.from(`${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    sendDownload(res, "application/json; charset=utf-8", `${safeName}_AI_Product_Launch_Report.json`, buffer);
+    return;
+  }
+
+  if (format === "docx") {
+    const buffer = buildDocx(project ? publicProductProject(project) : null, publicLaunchReport(report));
+    sendDownload(
+      res,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      `${safeName}_AI_Product_Launch_Report.docx`,
+      buffer
+    );
+    return;
+  }
+
+  if (format === "xlsx") {
+    const buffer = buildXlsx(project ? publicProductProject(project) : null, publicLaunchReport(report));
+    sendDownload(
+      res,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      `${safeName}_AI_Product_Launch_Report.xlsx`,
+      buffer
+    );
+    return;
+  }
+
+  sendValidationError(res, "Unsupported export format.");
+}
+
+function safeDownloadName(value) {
+  return String(value || "AI_Product_Launch_Report")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 80);
 }
 
 async function handleRegenerateReportSection(req, res, reportId, sectionType) {
@@ -1565,6 +1739,16 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/api/product-projects/compare") {
+    await handleCompareProjectReports(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/external-data/status") {
+    await handleExternalDataStatus(req, res);
+    return;
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/api/product-projects") {
     await handleCreateProductProject(req, res);
     return;
@@ -1581,6 +1765,13 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && reportStatusMatch) {
     await handleGetLaunchReportStatus(req, res, reportStatusMatch[1]);
+    return;
+  }
+
+  const reportExportMatch = requestUrl.pathname.match(/^\/api\/launch-reports\/([^/]+)\/export\/(json|docx|xlsx)$/);
+
+  if (req.method === "GET" && reportExportMatch) {
+    await handleExportLaunchReport(req, res, reportExportMatch[1], reportExportMatch[2]);
     return;
   }
 
@@ -1655,6 +1846,13 @@ async function handleRequest(req, res) {
   }
 
   const projectMatch = requestUrl.pathname.match(/^\/api\/product-projects\/([^/]+)$/);
+
+  const projectVersionsMatch = requestUrl.pathname.match(/^\/api\/product-projects\/([^/]+)\/launch-reports$/);
+
+  if (req.method === "GET" && projectVersionsMatch) {
+    await handleListProjectReportVersions(req, res, projectVersionsMatch[1]);
+    return;
+  }
 
   if (req.method === "GET" && projectMatch) {
     await handleGetProductProject(req, res, projectMatch[1]);

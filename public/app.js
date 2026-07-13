@@ -40,6 +40,8 @@ let downloadReportButton = null;
 let authMode = "register";
 let activeProject = null;
 let activeReport = null;
+let activeReportMode = "dashboard";
+let activeReportTheme = "executive-orange";
 const PROJECT_DRAFT_KEY = "ai_product_launch_project_draft";
 
 const LAUNCH_MODULES = [
@@ -500,11 +502,17 @@ function ensureDownloadReportButton() {
     return;
   }
 
-  downloadReportButton = document.createElement("button");
-  downloadReportButton.className = "primary-action";
-  downloadReportButton.type = "button";
-  downloadReportButton.textContent = "导出 PDF";
-  downloadReportButton.addEventListener("click", exportActiveReportPdf);
+  downloadReportButton = document.createElement("div");
+  downloadReportButton.className = "export-actions";
+  downloadReportButton.innerHTML = `
+    <button class="primary-action" type="button" data-export-report-file="pdf">导出 PDF</button>
+    <button class="ghost-button" type="button" data-export-report-file="docx">DOCX</button>
+    <button class="ghost-button" type="button" data-export-report-file="xlsx">XLSX</button>
+    <button class="ghost-button" type="button" data-export-report-file="json">JSON</button>
+  `;
+  downloadReportButton.querySelectorAll("[data-export-report-file]").forEach((button) => {
+    button.addEventListener("click", () => exportActiveReportFile(button.dataset.exportReportFile));
+  });
   headingActions.insertBefore(downloadReportButton, backToDetailButton);
 }
 
@@ -547,6 +555,470 @@ function scoreDimensionLabel(key) {
   return labels[key] || key;
 }
 
+function reportViz(report = activeReport) {
+  return report?.visualizationReport || null;
+}
+
+function formatBusinessNumber(value, unit = "") {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "待确认";
+  }
+
+  if (unit === "$") {
+    const abs = Math.abs(number);
+    if (abs >= 1000000) return `$${(number / 1000000).toFixed(2)}M`;
+    if (abs >= 1000) return `$${(number / 1000).toFixed(2)}K`;
+    return `$${number.toFixed(2)}`;
+  }
+
+  if (unit === "%") {
+    return `${number.toFixed(2)}%`;
+  }
+
+  if (unit === "x") {
+    return `${number.toFixed(2)}x`;
+  }
+
+  if (unit === "件" || unit === "项" || unit === "天") {
+    return `${Math.round(number).toLocaleString()} ${unit}`;
+  }
+
+  return `${number.toLocaleString()}${unit ? ` ${unit}` : ""}`;
+}
+
+function chartSeriesPoints(chart) {
+  return (chart?.series || []).flatMap((serie) => serie.data || []);
+}
+
+function pointOpacity(point) {
+  return point?.isEstimated ? "0.58" : "1";
+}
+
+function renderReportModeToolbar(report) {
+  const viz = reportViz(report);
+  const themes = viz?.theme?.themes || [
+    { id: "executive-orange", name: "Executive Orange" },
+    { id: "corporate-navy", name: "Corporate Navy" },
+    { id: "minimal-dark", name: "Minimal Dark" }
+  ];
+  const modes = [
+    ["dashboard", "驾驶舱"],
+    ["report", "完整报告"],
+    ["finance", "财务测算"],
+    ["planning", "年度计划"],
+    ["evidence", "数据证据"],
+    ["risk", "风险中心"]
+  ];
+
+  return `
+    <div class="report-mode-toolbar">
+      <div class="mode-tabs" role="tablist" aria-label="报告模式">
+        ${modes
+          .map(
+            ([mode, label]) => `
+              <button type="button" class="${activeReportMode === mode ? "is-active" : ""}" data-report-mode="${mode}" aria-label="切换到${label}">
+                ${label}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <label class="theme-switcher">
+        <span>主题</span>
+        <select data-report-theme aria-label="报告主题">
+          ${themes.map((theme) => `<option value="${escapeHtml(theme.id)}" ${theme.id === activeReportTheme ? "selected" : ""}>${escapeHtml(theme.name)}</option>`).join("")}
+        </select>
+      </label>
+    </div>
+  `;
+}
+
+function renderExecutiveHeader(project, report) {
+  const viz = reportViz(report);
+  const meta = viz?.reportMeta || {};
+  const dashboard = report.decisionDashboard || {};
+  const financial = report.financialModel?.formulas || {};
+  const profile = report.productProfile || {};
+
+  return `
+    <section class="executive-hero">
+      <div class="product-identity">
+        <div class="product-visual">
+          ${meta.productImageUrl ? `<img src="${escapeHtml(meta.productImageUrl)}" alt="${escapeHtml(project?.productName || "产品图片")}">` : `<span>${escapeHtml((project?.productName || "P").slice(0, 1))}</span>`}
+        </div>
+        <div>
+          <p class="eyebrow">AI Product Launch Report</p>
+          <h2>${escapeHtml(project?.productName || "打品报告")}</h2>
+          <div class="identity-meta">
+            <span>${escapeHtml(project?.category || profile.productCategory || "未填写类目")}</span>
+            <span>${escapeHtml(project?.targetMarket || "美国")}</span>
+            <span>${escapeHtml((project?.platforms || []).join(" / ") || "TikTok / Amazon")}</span>
+            <span>v${escapeHtml(report.version || 1)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button class="ghost-button" type="button" data-report-mode="finance" aria-label="编辑参数">编辑参数</button>
+        <button class="ghost-button" type="button" id="hero-regenerate-report" aria-label="重新分析">重新分析</button>
+        <button class="ghost-button" type="button" data-export-report-file="json" aria-label="保存版本">保存版本</button>
+        <button class="primary-action" type="button" data-export-report-file="pdf" aria-label="导出报告">导出报告</button>
+      </div>
+      <article class="decision-banner">
+        <div>
+          <span>项目推荐等级</span>
+          <strong>${escapeHtml(dashboard.recommendationGrade || "待评估")}</strong>
+        </div>
+        <div>
+          <span>建议动作</span>
+          <strong>${escapeHtml(dashboard.suggestedAction || report.recommendation || "谨慎测试")}</strong>
+        </div>
+        <div>
+          <span>首批备货</span>
+          <strong>${escapeHtml(dashboard.suggestedFirstBatchInventory ?? financial.suggestedFirstBatchInventory ?? "待确认")}</strong>
+        </div>
+        <div>
+          <span>测试预算</span>
+          <strong>${escapeHtml(formatBusinessNumber(dashboard.suggestedTestBudget, "$"))}</strong>
+        </div>
+        <div>
+          <span>净利润率</span>
+          <strong>${escapeHtml(formatBusinessNumber(Number(financial.netMargin || 0) * 100, "%"))}</strong>
+        </div>
+        <div>
+          <span>盈亏平衡ROAS</span>
+          <strong>${escapeHtml(formatBusinessNumber(financial.breakEvenRoas, "x"))}</strong>
+        </div>
+        <div class="score-ring" style="--score:${Number(dashboard.weightedScore || report.opportunityScore || 0)}">
+          <strong>${escapeHtml(dashboard.weightedScore || report.opportunityScore || "待评估")}</strong>
+          <span>适配度</span>
+        </div>
+      </article>
+      <div class="report-meta-strip">
+        <span>生成日期：${escapeHtml((report.generatedAt || "").slice(0, 10) || "待确认")}</span>
+        <span>数据更新：${escapeHtml((meta.updatedAt || report.updatedAt || report.generatedAt || "").slice(0, 10) || "待确认")}</span>
+        <span>数据完整度：${escapeHtml(meta.dataCompleteness ?? report.dataCredibilityScore ?? "待评估")} / 100</span>
+        <span>报告置信度：${escapeHtml(meta.confidence ?? report.dataCredibilityScore ?? "待评估")} / 100</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderMetricCards(report) {
+  const metrics = reportViz(report)?.metrics || [];
+
+  return `
+    <section class="metric-grid executive-grid">
+      ${metrics
+        .map(
+          (metric) => `
+            <article class="metric-card-viz ${metric.isEstimated ? "is-estimated" : ""}" title="${escapeHtml(metric.tooltip || "")}">
+              <span>${escapeHtml(metric.label)}</span>
+              <strong>${escapeHtml(formatBusinessNumber(metric.value, metric.unit))}</strong>
+              <p>${escapeHtml(metric.benchmark ? `基准：${metric.benchmark}` : metric.tooltip || "由公式模型计算")}</p>
+              <small>${escapeHtml(metric.status || "待复核")} · 置信度 ${escapeHtml(metric.confidenceLevel ?? 0)}%</small>
+            </article>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function renderBarVisual(chart) {
+  const points = chartSeriesPoints(chart);
+  const max = Math.max(...points.map((point) => Math.abs(Number(point.value) || 0)), 1);
+
+  return `
+    <div class="bar-chart" role="img" aria-label="${escapeHtml(chart.title)}">
+      ${points
+        .map(
+          (point) => `
+            <div class="bar-row">
+              <span>${escapeHtml(point.label)}</span>
+              <div><i style="width:${Math.max(4, (Math.abs(Number(point.value) || 0) / max) * 100)}%; opacity:${pointOpacity(point)}"></i></div>
+              <strong>${escapeHtml(formatBusinessNumber(point.value, point.unit || chart.unit))}</strong>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderComboVisual(chart) {
+  const revenue = chart.series?.[0]?.data || [];
+  const units = chart.series?.[1]?.data || [];
+  const maxRevenue = Math.max(...revenue.map((point) => Number(point.value) || 0), 1);
+  const maxUnits = Math.max(...units.map((point) => Number(point.value) || 0), 1);
+  const width = 520;
+  const height = 220;
+  const step = revenue.length > 1 ? width / (revenue.length - 1) : width;
+  const linePoints = units
+    .map((point, index) => `${index * step},${height - ((Number(point.value) || 0) / maxUnits) * (height - 24)}`)
+    .join(" ");
+
+  return `
+    <svg class="combo-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(chart.title)}">
+      ${revenue
+        .map((point, index) => {
+          const barHeight = ((Number(point.value) || 0) / maxRevenue) * (height - 28);
+          return `<rect x="${index * step - 16}" y="${height - barHeight}" width="32" height="${barHeight}" rx="4" opacity="${pointOpacity(point)}"></rect>`;
+        })
+        .join("")}
+      <polyline points="${linePoints}" fill="none" stroke="currentColor" stroke-width="3"></polyline>
+      ${units.map((point, index) => `<circle cx="${index * step}" cy="${height - ((Number(point.value) || 0) / maxUnits) * (height - 24)}" r="4"></circle>`).join("")}
+    </svg>
+  `;
+}
+
+function renderDonutVisual(chart) {
+  const points = chartSeriesPoints(chart);
+  const total = points.reduce((sum, point) => sum + Math.max(0, Number(point.value) || 0), 0);
+
+  if (!total) {
+    return renderEmptyChart(chart);
+  }
+
+  let cursor = 0;
+  const colors = ["var(--chart-blue)", "var(--chart-orange)", "var(--chart-green)", "var(--chart-red)", "var(--chart-gray)", "var(--chart-gold)"];
+  const gradient = points
+    .map((point, index) => {
+      const start = cursor;
+      const end = cursor + ((Math.max(0, Number(point.value) || 0) / total) * 100);
+      cursor = end;
+      return `${colors[index % colors.length]} ${start}% ${end}%`;
+    })
+    .join(", ");
+
+  return `
+    <div class="donut-wrap">
+      <div class="donut-chart" style="background: conic-gradient(${gradient})">
+        <span>${escapeHtml(formatBusinessNumber(total, chart.unit))}</span>
+        <small>总值</small>
+      </div>
+      <div class="chart-legend">
+        ${points.map((point, index) => `<span><i style="background:${colors[index % colors.length]}; opacity:${pointOpacity(point)}"></i>${escapeHtml(point.label)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderRadarVisual(chart) {
+  const points = chartSeriesPoints(chart);
+  const center = 120;
+  const radius = 92;
+  const polygon = points
+    .map((point, index) => {
+      const angle = (Math.PI * 2 * index) / Math.max(points.length, 1) - Math.PI / 2;
+      const valueRadius = radius * Math.min(1, Math.max(0, Number(point.value) || 0) / 100);
+      return `${center + Math.cos(angle) * valueRadius},${center + Math.sin(angle) * valueRadius}`;
+    })
+    .join(" ");
+
+  return `
+    <svg class="radar-chart" viewBox="0 0 240 240" role="img" aria-label="${escapeHtml(chart.title)}">
+      <circle cx="120" cy="120" r="92"></circle>
+      <circle cx="120" cy="120" r="60"></circle>
+      <circle cx="120" cy="120" r="30"></circle>
+      <polygon points="${polygon}"></polygon>
+      ${points
+        .map((point, index) => {
+          const angle = (Math.PI * 2 * index) / Math.max(points.length, 1) - Math.PI / 2;
+          return `<text x="${center + Math.cos(angle) * 110}" y="${center + Math.sin(angle) * 110}">${escapeHtml(point.label)}</text>`;
+        })
+        .join("")}
+    </svg>
+  `;
+}
+
+function renderEmptyChart(chart) {
+  const missing = chart.emptyState?.missing || [];
+
+  return `
+    <div class="chart-empty">
+      <strong>${escapeHtml(chart.emptyState?.title || "暂无足够数据")}</strong>
+      <p>当前缺少：${escapeHtml(missing.join("、") || "真实平台数据")}</p>
+      <span>${escapeHtml(chart.emptyState?.action || "建议补充数据后重新分析")}</span>
+    </div>
+  `;
+}
+
+function renderChartVisual(chart) {
+  const points = chartSeriesPoints(chart);
+
+  if (!points.length) {
+    return renderEmptyChart(chart);
+  }
+
+  if (chart.type === "combo") return renderComboVisual(chart);
+  if (chart.type === "donut") return renderDonutVisual(chart);
+  if (chart.type === "radar") return renderRadarVisual(chart);
+
+  return renderBarVisual(chart);
+}
+
+function renderChartDataTable(chart) {
+  const points = chartSeriesPoints(chart);
+
+  return `
+    <details class="chart-data-table">
+      <summary>查看数据表 / 数据来源 / 计算公式</summary>
+      <div class="data-table">
+        <div><strong>指标</strong><strong>数值</strong><strong>来源</strong><strong>置信度</strong><strong>说明</strong></div>
+        ${points
+          .map(
+            (point) => `
+              <div>
+                <span>${escapeHtml(point.label)}</span>
+                <span>${escapeHtml(formatBusinessNumber(point.value, point.unit || chart.unit))}</span>
+                <span>${escapeHtml(point.sourceType)}${point.isEstimated ? " · 估算" : ""}</span>
+                <span>${escapeHtml(point.confidenceLevel ?? 0)}%</span>
+                <span>${escapeHtml(point.note || chart.dataSource?.label || "")}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </details>
+  `;
+}
+
+function renderChartCard(chart) {
+  const summary = chart.summary || {};
+
+  return `
+    <article class="chart-card" data-chart-id="${escapeHtml(chart.id)}">
+      <div class="chart-card-header">
+        <div>
+          <span>${escapeHtml(chart.type)} · ${escapeHtml(chart.dataSource?.sourceType || "program_calculation")}</span>
+          <h3>${escapeHtml(chart.title)}</h3>
+          <p>${escapeHtml(chart.subtitle)}</p>
+        </div>
+        <div class="chart-actions">
+          <button type="button" aria-label="查看数据表">数据</button>
+          <button type="button" aria-label="下载PNG">PNG</button>
+          <button type="button" aria-label="全屏查看">全屏</button>
+        </div>
+      </div>
+      ${renderChartVisual(chart)}
+      <div class="chart-explain">
+        <p><strong>主要发现：</strong>${escapeHtml(summary.primaryMetric || "暂无足够数据")}</p>
+        <p><strong>经营影响：</strong>${escapeHtml(summary.businessMeaning || chart.subtitle || "用于经营决策复核")}</p>
+        <p><strong>建议动作：</strong>${summary.dataQuality?.estimatedCount ? "该图包含估算数据，上线前需要用真实平台数据复核。" : "当前图表可作为经营讨论基线。"}</p>
+        <p><strong>数据来源：</strong>${escapeHtml(chart.dataSource?.label || "用户输入和程序计算")} · 更新时间 ${escapeHtml((chart.dataSource?.updatedAt || "").slice(0, 10) || "待确认")}</p>
+      </div>
+      ${renderChartDataTable(chart)}
+    </article>
+  `;
+}
+
+function chartsByMode(report, mode) {
+  const charts = reportViz(report)?.charts || [];
+
+  if (mode === "finance") {
+    return charts.filter((chart) => ["unit-profit-waterfall", "cost-structure", "scenario-comparison"].includes(chart.id));
+  }
+
+  if (mode === "planning") {
+    return charts.filter((chart) => ["monthly-sales-units", "channel-share"].includes(chart.id));
+  }
+
+  if (mode === "risk") {
+    return charts.filter((chart) => ["risk-distribution", "capability-radar"].includes(chart.id));
+  }
+
+  if (mode === "evidence") {
+    return charts;
+  }
+
+  return charts.slice(0, 4);
+}
+
+function renderExecutiveDashboard(report) {
+  const charts = chartsByMode(report, activeReportMode);
+  const pages = reportViz(report)?.pages || [];
+
+  return `
+    <div class="executive-report-shell report-theme-${escapeHtml(activeReportTheme)}">
+      ${renderReportModeToolbar(report)}
+      ${renderExecutiveHeader(activeProject || {}, report)}
+      ${renderMetricCards(report)}
+      <section class="visual-layout">
+        <div class="visual-main">
+          ${charts.map(renderChartCard).join("")}
+          ${activeReportMode === "report" ? renderLegacyReportModuleStack(report) : ""}
+          ${activeReportMode === "evidence" ? renderP2ExportVersionPanel(report) : ""}
+        </div>
+        <aside class="visual-aside">
+          <h3>章节导航</h3>
+          ${pages
+            .map(
+              (page) => `
+                <button type="button" class="${page.mode === activeReportMode ? "is-active" : ""}" data-report-mode="${escapeHtml(page.mode)}">
+                  <span>${escapeHtml(page.number)}</span>
+                  <strong>${escapeHtml(page.title)}</strong>
+                  <small>${escapeHtml(page.completion)}%</small>
+                </button>
+              `
+            )
+            .join("")}
+          <div class="risk-dot-card">
+            <strong>待确认数据</strong>
+            <p>${escapeHtml(report.validationChecklist?.length || report.consistencyChecks?.length || 0)} 项需要运营复核</p>
+          </div>
+        </aside>
+      </section>
+    </div>
+  `;
+}
+
+function renderLegacyReportModuleStack(report) {
+  return `
+    <section class="report-reading-stack">
+      ${(report.sections || [])
+        .map(
+          (section, index) => `
+            <article class="report-page-card">
+              <header>
+                <span>P${index + 1}</span>
+                <h3>${escapeHtml(section.title || moduleLabel(section.type))}</h3>
+                <small>数据置信度：${escapeHtml(section.confidence || report.dataCredibilityScore || "待评估")}</small>
+              </header>
+              <p>${escapeHtml(section.content || section.purpose || "")}</p>
+              ${renderStructuredSection(section)}
+            </article>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function bindExecutiveReportControls() {
+  reportSections.querySelectorAll("[data-report-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeReportMode = button.dataset.reportMode || "dashboard";
+      renderReportModulesV3(activeReport?.sections || [], activeReport?.sections?.[0]?.type);
+    });
+  });
+  reportModuleNav.querySelectorAll("[data-report-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeReportMode = button.dataset.reportMode || "dashboard";
+      renderReportModulesV3(activeReport?.sections || [], activeReport?.sections?.[0]?.type);
+    });
+  });
+  reportSections.querySelector("[data-report-theme]")?.addEventListener("change", (event) => {
+    activeReportTheme = event.target.value || "executive-orange";
+    renderReportModulesV3(activeReport?.sections || [], activeReport?.sections?.[0]?.type);
+  });
+  reportSections.querySelectorAll("[data-export-report-file]").forEach((button) => {
+    button.addEventListener("click", () => exportActiveReportFile(button.dataset.exportReportFile));
+  });
+  reportSections.querySelector("#hero-regenerate-report")?.addEventListener("click", generateLaunchReport);
+}
+
 function renderEvaluationLayer(report) {
   const model = report.productEvaluationModel;
   const burstProbability = scoreToPercent(model?.totalScore ?? report.opportunityScore);
@@ -572,6 +1044,65 @@ function renderEvaluationLayer(report) {
           <strong>${escapeHtml(report.dataCredibilityScore ?? "待评估")}</strong>
           <p>数据可信度 / 100</p>
         </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderP2ExportVersionPanel(report) {
+  const changeLog = report.changeLog || [];
+  const connectors = report.externalDataStatus?.connectors || [
+    { name: "Amazon", status: "待接入", scope: "销量、评论、竞品价格" },
+    { name: "TikTok Shop", status: "待接入", scope: "达人、内容、GMV" },
+    { name: "Walmart", status: "待接入", scope: "价格、Listing、竞品" },
+    { name: "Google Trends", status: "待接入", scope: "搜索趋势、季节性" }
+  ];
+
+  return `
+    <section class="p2-panel">
+      <div class="module-detail-header">
+        <div>
+          <span>Export & Version</span>
+          <h3>导出、版本和外部数据接口</h3>
+        </div>
+        <div class="export-actions">
+          <button class="primary-action" type="button" data-export-report-file="pdf">导出 PDF</button>
+          <button class="ghost-button" type="button" data-export-report-file="docx">DOCX</button>
+          <button class="ghost-button" type="button" data-export-report-file="xlsx">XLSX</button>
+          <button class="ghost-button" type="button" data-export-report-file="json">JSON</button>
+        </div>
+      </div>
+      <div class="module-table">
+        ${connectors
+          .map(
+            (connector) => `
+              <div>
+                <span>${escapeHtml(connector.name)}</span>
+                <strong>${escapeHtml(connector.status)}</strong>
+                <p>${escapeHtml(connector.scope || connector.description || "用于后续接入真实平台数据")}</p>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="version-log">
+        <h4>报告版本记录</h4>
+        ${
+          changeLog.length
+            ? changeLog
+                .map(
+                  (item) => `
+                    <p>
+                      <strong>v${escapeHtml(item.version || report.version || 1)}</strong>
+                      ${escapeHtml(item.action || "updated")}
+                      <span>${escapeHtml(item.createdAt || report.generatedAt || "")}</span>
+                      ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ""}
+                    </p>
+                  `
+                )
+                .join("")
+            : `<p><strong>v${escapeHtml(report.version || 1)}</strong> 当前报告版本 <span>${escapeHtml(report.generatedAt || "")}</span></p>`
+        }
       </div>
     </section>
   `;
@@ -752,10 +1283,11 @@ function renderPrintableReport() {
         <div><span>成本</span><strong>${escapeHtml(project.costPrice ?? "未填写")}</strong></div>
         <div><span>竞品链接</span><strong>${escapeHtml((project.competitorLinks || []).join(" / ") || "未提供")}</strong></div>
       </div>
-    </section>
-    ${renderEvaluationLayer(report)}
-    ${modulePages}
-  `;
+      </section>
+      ${renderEvaluationLayer(report)}
+      ${renderP2ExportVersionPanel(report)}
+      ${modulePages}
+    `;
 }
 
 function exportActiveReportPdf() {
@@ -796,6 +1328,20 @@ function exportActiveReportPdf() {
     </html>
   `);
   printWindow.document.close();
+}
+
+function exportActiveReportFile(format) {
+  if (format === "pdf") {
+    exportActiveReportPdf();
+    return;
+  }
+
+  if (!activeReport?.id) {
+    reportMessage.textContent = "请先生成或打开一份报告，再导出文件。";
+    return;
+  }
+
+  window.location.href = `/api/launch-reports/${encodeURIComponent(activeReport.id)}/export/${encodeURIComponent(format)}`;
 }
 
 function projectFormSnapshot() {
@@ -851,6 +1397,25 @@ function setupProjectDraftPersistence() {
 }
 
 function renderReportModulesV3(sections, activeType) {
+  if (reportViz(activeReport)) {
+    reportModuleNav.innerHTML = (reportViz(activeReport).pages || [])
+      .map(
+        (page) => `
+          <button class="module-nav-item ${page.mode === activeReportMode ? "is-active" : ""}" type="button" data-report-mode="${escapeHtml(page.mode)}">
+            <span class="nav-number">${escapeHtml(page.number)}</span>
+            <span class="nav-title-group">
+              <strong class="nav-title-cn">${escapeHtml(page.title)}</strong>
+              <small class="nav-title-en">${escapeHtml(page.completion)}% 完成</small>
+            </span>
+          </button>
+        `
+      )
+      .join("");
+    reportSections.innerHTML = renderExecutiveDashboard(activeReport);
+    bindExecutiveReportControls();
+    return;
+  }
+
   const activeModule = LAUNCH_MODULES.find((module) => module.type === activeType) || LAUNCH_MODULES[0];
   const activeModuleIndex = LAUNCH_MODULES.findIndex((module) => module.type === activeModule.type);
   const activeSection = sectionForLaunchModule(sections, activeModule.type, activeModuleIndex);
@@ -871,11 +1436,15 @@ function renderReportModulesV3(sections, activeType) {
 
   reportSections.innerHTML = `
     ${renderEvaluationLayer(activeReport)}
+    ${renderP2ExportVersionPanel(activeReport)}
     ${renderLaunchModulePage(activeModule, activeSection, activeReport)}
   `;
 
   reportModuleNav.querySelectorAll("[data-section-type]").forEach((button) => {
     button.addEventListener("click", () => renderReportModulesV3(sections, button.dataset.sectionType));
+  });
+  reportSections.querySelectorAll("[data-export-report-file]").forEach((button) => {
+    button.addEventListener("click", () => exportActiveReportFile(button.dataset.exportReportFile));
   });
 }
 

@@ -5,7 +5,11 @@
   "description": "AI Product Launch OS MVP scaffold for TikTok, Amazon, and Walmart sellers.",
   "type": "module",
   "scripts": {
-    "build": "node --check server/index.js && node --check public/app.js && node --check src/ai-engine/index.js",
+    "build": "node --check server/index.js && node --check public/app.js && node --check src/ai-engine/index.js && node --check src/domain/data-source.js && node --check src/domain/project-input.js && node --check src/domain/financial-engine.js && node --check src/domain/decision-engine.js && node --check src/domain/consistency-check.js && node --check src/domain/operating-engine.js && node --check src/domain/export-engine.js && node --check src/domain/visualization-report.js",
+    "test:financial": "node scripts/financial-engine-test.js",
+    "test:operating": "node scripts/operating-engine-test.js",
+    "test:export": "node scripts/export-engine-test.js",
+    "test:visualization": "node scripts/visualization-report-test.js",
     "dev": "node server/index.js",
     "start": "node server/index.js",
     "health": "node scripts/check-health.js",
