@@ -39,7 +39,8 @@ function deepSeekBodyFromResponsesBody(body) {
     response_format: {
       type: "json_object"
     },
-    temperature: 0.2
+    temperature: 0.2,
+    max_tokens: Math.min(Number(body.max_output_tokens) || 8192, 8192)
   };
 }
 
@@ -182,11 +183,29 @@ export async function requestOpenAiResponses(body, options = {}) {
 }
 
 export function parseOpenAiOutputJson(payload) {
-  const outputText = payload.output_text;
+  const outputText = String(payload.output_text || "")
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
 
   if (!outputText) {
     throw new Error("AI provider response did not include JSON output text.");
   }
 
-  return JSON.parse(outputText);
+  try {
+    return JSON.parse(outputText);
+  } catch (error) {
+    const finishReason = payload.choices?.[0]?.finish_reason || payload.status || "";
+
+    if (
+      finishReason === "length" ||
+      error.message.includes("Unterminated string") ||
+      error.message.includes("Unexpected end")
+    ) {
+      throw new Error("AI 返回的 JSON 不完整，系统将自动重试生成精简版报告。");
+    }
+
+    throw error;
+  }
 }
