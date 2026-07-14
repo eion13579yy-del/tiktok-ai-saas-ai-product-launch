@@ -341,7 +341,7 @@ export async function generateAiEngineReport(project) {
     "7. compliance_ai：风险合规（Compliance AI），覆盖 TikTok违规、医疗宣称、夸大宣传、品类限制、知识产权、专利、商标、版权、FCC/ETL/UL/Prop 65/CPSIA/电池运输/平台资质和风险评分。",
     "8. launch_plan：打品计划（Launch Plan），覆盖90天计划、每周视频数、达人、直播、广告预算、GMV目标、补货和放大规则。",
     "9. decision_center：AI决策中心（Decision Center），覆盖市场容量、利润空间、TikTok/Amazon/Walmart适配、达人适配、内容可玩性、合规风险、供应链成熟度、售后风险、推荐指数、是否立项、首批备货、达人合作、短视频产出、直播时长、30/90/365天GMV。",
-    "每个 section 的 moduleItems 必须逐项生成中文业务内容。没有真实外部数据时，value 必须写成 AI推测/待验证口径，不能写成确定事实。"
+    "每个 section 的 moduleItems 必须逐项生成中文业务内容。没有真实外部数据时，value 必须写成 预计/待验证口径，不能写成确定事实。"
   ].join("\n\n");
   const payload = await requestOpenAiResponses({
     model: config.model,

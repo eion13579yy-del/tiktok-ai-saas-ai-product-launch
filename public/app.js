@@ -173,6 +173,8 @@ function switchPanel(panelId) {
 
 function escapeHtml(value) {
   return String(value ?? "")
+    .replaceAll("AI 推测", "预计")
+    .replaceAll("AI推测", "预计")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
