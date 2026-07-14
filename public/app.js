@@ -781,13 +781,67 @@ function renderProfitModelTable(items, report) {
             <div class="profit-model-row ${index >= rows.length - 3 ? "is-summary" : ""}">
               <strong>${escapeHtml(row.label)}</strong>
               <span>${escapeHtml(row.formula)}</span>
-              <b>${escapeHtml(row.estimate)}</b>
+              <input
+                class="profit-estimate-input"
+                type="text"
+                inputmode="decimal"
+                data-profit-estimate
+                data-profit-row-index="${index}"
+                data-profit-label="${escapeHtml(row.label)}"
+                data-profit-formula="${escapeHtml(row.formula)}"
+                value="${escapeHtml(row.estimate)}"
+                aria-label="${escapeHtml(`${row.label}费用预估`)}"
+              >
             </div>
           `
         )
         .join("")}
     </div>
   `;
+}
+
+function syncProfitModelInputs() {
+  if (!activeReport) {
+    return;
+  }
+
+  const fields = Array.from(reportSections.querySelectorAll("[data-profit-estimate]"));
+  if (!fields.length) {
+    return;
+  }
+
+  if (!Array.isArray(activeReport.sections)) {
+    activeReport.sections = [];
+  }
+
+  let section = activeReport.sections.find((item) => item.type === "profit_model" || item.id === "profit_model");
+
+  if (!section) {
+    section = {
+      type: "profit_model",
+      id: "profit_model",
+      title: "利润模型",
+      content: "用户自定义利润模型。",
+      purpose: "用户自定义利润模型。",
+      findings: [],
+      recommendations: [],
+      risks: []
+    };
+    activeReport.sections.push(section);
+  }
+
+  section.moduleItems = fields.map((field) => ({
+    label: field.dataset.profitLabel || "",
+    value: field.value,
+    basis: field.dataset.profitFormula || "用户输入"
+  }));
+}
+
+function bindProfitModelInputs() {
+  reportSections.querySelectorAll("[data-profit-estimate]").forEach((field) => {
+    field.addEventListener("input", syncProfitModelInputs);
+    field.addEventListener("change", syncProfitModelInputs);
+  });
 }
 
 function renderLaunchModulePage(module, section, report) {
@@ -984,6 +1038,7 @@ function renderReportModulesV3(sections, activeType) {
   reportModuleNav.querySelectorAll("[data-section-type]").forEach((button) => {
     button.addEventListener("click", () => renderReportModulesV3(sections, button.dataset.sectionType));
   });
+  bindProfitModelInputs();
 }
 
 function renderReportModules(sections, activeType) {

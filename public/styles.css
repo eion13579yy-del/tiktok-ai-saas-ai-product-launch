@@ -956,7 +956,7 @@ h1 {
 }
 
 .profit-model-head strong:last-child,
-.profit-model-row b {
+.profit-estimate-input {
   text-align: right;
 }
 
@@ -980,12 +980,26 @@ h1 {
   line-height: 1.5;
 }
 
-.profit-model-row b {
+.profit-estimate-input {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   color: #0f243a;
+  background: transparent;
+  font: inherit;
+  font-weight: 900;
   white-space: nowrap;
 }
 
-.profit-model-row.is-summary b {
+.profit-estimate-input:focus {
+  outline: 2px solid rgba(79, 131, 189, 0.35);
+  border-color: #4f83bd;
+  background: #ffffff;
+}
+
+.profit-model-row.is-summary .profit-estimate-input {
   color: #d97706;
 }
 
@@ -1818,7 +1832,7 @@ article p {
   }
 
   .profit-model-head strong:last-child,
-  .profit-model-row b {
+  .profit-estimate-input {
     text-align: left;
   }
 
