@@ -96,6 +96,12 @@ const LAUNCH_MODULES = [
     title: "AI决策中心",
     subtitle: "Decision Center",
     fallbackItems: ["市场容量", "利润空间", "TikTok适配", "Amazon适配", "Walmart适配", "达人适配", "内容可玩性", "合规风险", "供应链成熟度", "售后风险", "推荐指数", "建议立项", "首批备货", "达人合作", "短视频产出", "直播时长", "30/90/365天GMV"]
+  },
+  {
+    type: "profit_model",
+    title: "利润模型",
+    subtitle: "Profit Model",
+    fallbackItems: ["商品出厂价", "关税（Duty）", "海运费（LCL）", "港口及清关费", "总落地成本", "尾程配送费", "燃油附加费", "商品出仓成本", "仓储费", "广告成本", "平台佣金", "退货与损耗", "运营费用合计", "商品总成本", "商品毛利", "运营利润"]
   }
 ];
 
@@ -687,6 +693,103 @@ function renderLaunchPlanTable(items) {
   `;
 }
 
+function currencyValue(value, fallback = "") {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback || String(value ?? "待验证");
+  }
+
+  return `$${number.toFixed(2)}`;
+}
+
+function percentValue(value, fallback = "待验证") {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return `${(number * 100).toFixed(2)}%`;
+}
+
+function findModuleItemValue(items, names) {
+  const matched = items.find((item) => names.some((name) => String(item.label || "").includes(name)));
+  return matched?.value || "";
+}
+
+function buildProfitModelRows(items, report) {
+  const project = activeProject || {};
+  const financial = report.financialModel?.formulas || {};
+  const financialInputs = report.financialModel?.inputs || {};
+  const targetPrice = Number(project.targetPrice ?? financialInputs.salePrice);
+  const factoryCost = Number(project.costPrice ?? financialInputs.factoryPrice);
+  const landedCost = Number(financial.landedCost);
+  const fulfillmentCost = Number(financial.fulfillmentCost);
+  const totalCost = Number(financial.totalCostPerUnit);
+  const commission = Number(financial.platformFee);
+  const adCost = Number(financial.adCostPerOrder);
+  const returnLoss = Number(financial.returnLossPerUnit);
+  const netProfit = Number(financial.netProfitPerUnit);
+  const netMargin = Number(financial.netMargin);
+  const grossMargin = Number.isFinite(targetPrice) && Number.isFinite(totalCost) && targetPrice > 0
+    ? (targetPrice - totalCost) / targetPrice
+    : undefined;
+
+  const defaultRows = [
+    ["商品出厂价", "供应商报价或用户输入成本", currencyValue(factoryCost, "$70.58")],
+    ["关税（Duty）", "按目标品类 HS Code 和美国进口税率估算，最终以报关资料为准", findModuleItemValue(items, ["关税"]) || "$3.99"],
+    ["海运费（LCL）", "单箱体积 × 当期海运市场价，需用货代报价复核", findModuleItemValue(items, ["海运"]) || "$5.10"],
+    ["港口及清关费", "ISF 申报、码头杂费、清关及到仓拖车分摊", findModuleItemValue(items, ["港口", "清关"]) || "$4.00"],
+    ["总落地成本", "出厂价 + 关税 + 国际物流", currencyValue(landedCost, "$83.67")],
+    ["尾程配送费", "按美国仓到消费者地址的包裹配送费估算", findModuleItemValue(items, ["尾程"]) || "$13.50"],
+    ["燃油附加费", "按当前尾程附加费比例估算", findModuleItemValue(items, ["燃油"]) || "$0.47"],
+    ["商品出仓成本", "出厂 + 关税 + 国际物流 + 尾程配送 + 附加费", currencyValue(fulfillmentCost || totalCost, "$97.64")],
+    ["仓储费", "按体积、周转周期和淡旺季仓租估算", findModuleItemValue(items, ["仓储"]) || "$1.08"],
+    ["广告成本", "按启动期 ROAS 与销售额占比估算", currencyValue(adCost, "$39.58")],
+    ["平台佣金", "售价 × 平台佣金率", currencyValue(commission, "$10.79")],
+    ["退货与损耗", "按退货率、仓返和折旧损耗估算", currencyValue(returnLoss, "$5.39")],
+    ["运营费用合计", "仓储 + 广告 + 平台佣金 + 售后", findModuleItemValue(items, ["运营费用"]) || "$56.84"],
+    ["商品总成本", "商品 + 物流 + 营销所有费用", currencyValue(totalCost, "$154.48")],
+    ["商品毛利", "（售价 - 商品出仓成本）/ 售价 × 100%", percentValue(grossMargin, "45.72%")],
+    ["运营利润", "（售价 - 商品总成本）/ 售价 × 100%", percentValue(netMargin, Number.isFinite(netProfit) && Number.isFinite(targetPrice) && targetPrice > 0 ? `${((netProfit / targetPrice) * 100).toFixed(2)}%` : "12.46%")]
+  ];
+
+  return defaultRows.map(([label, formula, estimate]) => {
+    const matched = items.find((item) => String(item.label || "").includes(label));
+    return {
+      label,
+      formula: matched?.basis || formula,
+      estimate: matched?.value || estimate
+    };
+  });
+}
+
+function renderProfitModelTable(items, report) {
+  const rows = buildProfitModelRows(items, report);
+
+  return `
+    <div class="profit-model-table">
+      <div class="profit-model-head">
+        <strong>项目</strong>
+        <strong>计算逻辑</strong>
+        <strong>费用预估</strong>
+      </div>
+      ${rows
+        .map(
+          (row, index) => `
+            <div class="profit-model-row ${index >= rows.length - 3 ? "is-summary" : ""}">
+              <strong>${escapeHtml(row.label)}</strong>
+              <span>${escapeHtml(row.formula)}</span>
+              <b>${escapeHtml(row.estimate)}</b>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function renderLaunchModulePage(module, section, report) {
   const items = buildLaunchModuleItems(module, section);
   const profile = report.productProfile || {};
@@ -695,7 +798,9 @@ function renderLaunchModulePage(module, section, report) {
       ? renderDecisionCenterTable(report)
       : module.type === "launch_plan"
         ? renderLaunchPlanTable(items)
-        : "";
+        : module.type === "profit_model"
+          ? renderProfitModelTable(items, report)
+          : "";
 
   return `
     <article class="module-detail launch-module-page">
@@ -715,7 +820,7 @@ function renderLaunchModulePage(module, section, report) {
         <p><strong>场景：</strong>${escapeHtml((profile.useScenarios || []).join(" / "))}</p>
         <p><strong>人群：</strong>${escapeHtml((profile.consumerSegments || []).join(" / "))}</p>
       </div>
-      ${renderLaunchModuleItems(items)}
+      ${module.type === "profit_model" ? "" : renderLaunchModuleItems(items)}
       ${extra}
       <div class="module-bullets">
         ${(section?.findings || []).map((item) => `<p>${escapeHtml(item)}</p>`).join("")}

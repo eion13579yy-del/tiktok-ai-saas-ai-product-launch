@@ -633,6 +633,7 @@ h1 {
 .module-item-grid article *,
 .module-table *,
 .launch-plan-table *,
+.profit-model-table *,
 .module-bullets *,
 .ghost-button,
 .primary-action {
@@ -928,6 +929,64 @@ h1 {
 .launch-plan-table > div:first-child {
   color: var(--accent-strong);
   background: #eef6f6;
+}
+
+.profit-model-table {
+  display: grid;
+  margin-top: 16px;
+  border: 1px solid #d7e2f0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.profit-model-head,
+.profit-model-row {
+  display: grid;
+  grid-template-columns: 0.9fr 2.2fr 0.8fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.profit-model-head {
+  padding: 10px 16px;
+  color: #ffffff;
+  background: #4f83bd;
+  font-weight: 900;
+}
+
+.profit-model-head strong:last-child,
+.profit-model-row b {
+  text-align: right;
+}
+
+.profit-model-row {
+  min-height: 36px;
+  padding: 8px 16px;
+  color: #102033;
+  border-top: 1px solid #e4ecf5;
+}
+
+.profit-model-row:nth-child(odd) {
+  background: #edf3f9;
+}
+
+.profit-model-row strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.profit-model-row span {
+  line-height: 1.5;
+}
+
+.profit-model-row b {
+  color: #0f243a;
+  white-space: nowrap;
+}
+
+.profit-model-row.is-summary b {
+  color: #d97706;
 }
 
 .score-grid {
@@ -1751,6 +1810,16 @@ article p {
 
   .launch-plan-table > div {
     grid-template-columns: 1fr;
+  }
+
+  .profit-model-head,
+  .profit-model-row {
+    grid-template-columns: 1fr;
+  }
+
+  .profit-model-head strong:last-child,
+  .profit-model-row b {
+    text-align: left;
   }
 
   .span-2 {

@@ -27,7 +27,8 @@ const AI_ENGINE_SECTION_SCHEMA = {
         "comment_ai",
         "compliance_ai",
         "launch_plan",
-        "decision_center"
+        "decision_center",
+        "profit_model"
       ]
     },
     title: { type: "string" },
@@ -156,8 +157,8 @@ export const AI_ENGINE_REPORT_SCHEMA = {
     },
     sections: {
       type: "array",
-      minItems: 9,
-      maxItems: 9,
+      minItems: 10,
+      maxItems: 10,
       items: AI_ENGINE_SECTION_SCHEMA
     }
   }
@@ -331,7 +332,7 @@ export async function generateAiEngineReport(project) {
   const modulePrompt = [
     buildPrompt(project),
     "scoreInsight 必须是一句简体中文点评，由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，只说明评分背后的核心判断，不要重复每个评分维度的通用说明。",
-    "sections 必须固定输出 9 个模块，id 和顺序必须完全如下：",
+    "sections 必须固定输出 10 个模块，id 和顺序必须完全如下：",
     "1. market_intelligence：市场分析（Market Intelligence），覆盖 TAM/SAM/SOM、Amazon/TikTok/Walmart销量预估、Google Trends近5年趋势、季节性、价格带、品牌集中度、TOP100竞品、店铺分布、利润率、预计GMV、预计ROI、市场进入评分、30/90/180/365天销量预测、备货建议、资金占用预测。",
     "2. creator_intelligence：达人画像（Creator Intelligence），覆盖达人类型、粉丝画像、年龄、性别、地区、消费能力、兴趣标签、爆款率、GMV、播放、CTR、CVR、佣金、竞品合作、合作难度、达人分层和百万GMV所需达人数量。",
     "3. consumer_intelligence：用户画像（Consumer Intelligence），覆盖年龄、性别、收入、职业、购买原因和核心痛点。",
@@ -341,6 +342,7 @@ export async function generateAiEngineReport(project) {
     "7. compliance_ai：风险合规（Compliance AI），覆盖 TikTok违规、医疗宣称、夸大宣传、品类限制、知识产权、专利、商标、版权、FCC/ETL/UL/Prop 65/CPSIA/电池运输/平台资质和风险评分。",
     "8. launch_plan：打品计划（Launch Plan），覆盖90天计划、每周视频数、达人、直播、广告预算、GMV目标、补货和放大规则。",
     "9. decision_center：AI决策中心（Decision Center），覆盖市场容量、利润空间、TikTok/Amazon/Walmart适配、达人适配、内容可玩性、合规风险、供应链成熟度、售后风险、推荐指数、是否立项、首批备货、达人合作、短视频产出、直播时长、30/90/365天GMV。",
+    "10. profit_model：利润模型（Profit Model），必须按三列表格逻辑生成 moduleItems：商品出厂价、关税（Duty）、海运费（LCL）、港口及清关费、总落地成本、尾程配送费、燃油附加费、商品出仓成本、仓储费、广告成本、平台佣金、退货与损耗、运营费用合计、商品总成本、商品毛利、运营利润。每项 label 写项目名，basis 写计算逻辑，value 写费用预估或利润率。",
     "每个 section 的 moduleItems 必须逐项生成中文业务内容。没有真实外部数据时，value 必须写成 预计/待验证口径，不能写成确定事实。"
   ].join("\n\n");
   const payload = await requestOpenAiResponses({
