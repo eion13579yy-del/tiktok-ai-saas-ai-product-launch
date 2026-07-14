@@ -594,22 +594,76 @@ function sectionForLaunchModule(sections, moduleType, index) {
   );
 }
 
-function buildLaunchModuleItems(module, section) {
-  if (section?.moduleItems?.length) {
-    return section.moduleItems;
-  }
+function compactReportList(value, fallback) {
+  return Array.isArray(value) && value.filter(Boolean).length
+    ? value.filter(Boolean).slice(0, 2).join("、")
+    : fallback;
+}
 
+function currentReportContext() {
+  const profile = activeReport?.productProfile || {};
+
+  return {
+    product: activeProject?.productName || "该产品",
+    category: profile.productCategory || activeProject?.category || "待识别品类",
+    scenarios: compactReportList(profile.useScenarios, "待识别使用场景"),
+    consumers: compactReportList(profile.consumerSegments, "待识别消费人群"),
+    price: activeProject?.targetPrice ? `$${activeProject.targetPrice}` : profile.priceBand || "待确认价格带",
+    cost: activeProject?.costPrice ? `$${activeProject.costPrice}` : "待确认成本",
+    platforms: compactReportList(activeProject?.platforms, "TikTok / Amazon / Walmart"),
+    market: activeProject?.targetMarket || "目标市场"
+  };
+}
+
+function isGenericReportText(value) {
+  const text = String(value || "");
+
+  return (
+    !text.trim() ||
+    text.length < 16 ||
+    /Product Profile\s*\+?\s*AI|AI推理|平台上下文|动态章节推理|AI Engine output|通用|模板/.test(text)
+  );
+}
+
+function productSpecificValue(module, label, section, index) {
+  const context = currentReportContext();
   const sourceItems = [
     ...(section?.findings || []),
     ...(section?.recommendations || []),
     ...(section?.risks || [])
   ];
-  const fallbackValue = "由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，需接入真实平台数据复核。";
+  const sourceValue = sourceItems[index % Math.max(sourceItems.length, 1)];
+
+  if (sourceValue && !isGenericReportText(sourceValue)) {
+    return sourceValue;
+  }
+
+  return `预计${context.product}在${context.market}的${module.title}中，“${label}”需要结合${context.category}属性、${context.scenarios}场景、${context.consumers}人群和${context.platforms}渠道单独判断。`;
+}
+
+function productSpecificBasis(label, section) {
+  const context = currentReportContext();
+
+  if (section?.modelReasoning && !isGenericReportText(section.modelReasoning)) {
+    return `${section.modelReasoning} 当前字段聚焦“${label}”。`;
+  }
+
+  return `Model Reasoning: 基于${context.product}的${context.category}属性、${context.price}售价、${context.cost}成本、${context.scenarios}场景、${context.consumers}人群和${context.platforms}渠道，对“${label}”做差异化预计。`;
+}
+
+function buildLaunchModuleItems(module, section) {
+  if (section?.moduleItems?.length) {
+    return section.moduleItems.map((item) => ({
+      ...item,
+      value: isGenericReportText(item.value) ? productSpecificValue(module, item.label || "结论", section, 0) : item.value,
+      basis: isGenericReportText(item.basis) ? productSpecificBasis(item.label || "结论", section) : item.basis
+    }));
+  }
 
   return module.fallbackItems.map((label, index) => ({
     label,
-    value: sourceItems[index % Math.max(sourceItems.length, 1)] || fallbackValue,
-    basis: section?.modelReasoning || "Product Profile + AI推理"
+    value: productSpecificValue(module, label, section, index),
+    basis: productSpecificBasis(label, section)
   }));
 }
 

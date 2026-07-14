@@ -179,6 +179,79 @@ function clampScore(value) {
   return Math.max(0, Math.min(100, Number.isFinite(numeric) ? Math.round(numeric) : 0));
 }
 
+function compactList(value, fallback = "待识别") {
+  if (Array.isArray(value) && value.length > 0) {
+    return value.filter(Boolean).slice(0, 3).join("、");
+  }
+
+  return value || fallback;
+}
+
+function projectContext(project, profile = {}) {
+  return {
+    product: project.productName || "该产品",
+    category: profile.productCategory || project.category || "待识别品类",
+    scenarios: compactList(profile.useScenarios, "待识别使用场景"),
+    consumers: compactList(profile.consumerSegments, "待识别消费人群"),
+    price: project.targetPrice ? `$${project.targetPrice}` : profile.priceBand || "待确认价格带",
+    cost: project.costPrice ? `$${project.costPrice}` : "待确认成本",
+    platforms: compactList(project.platforms, "TikTok / Amazon / Walmart"),
+    market: project.targetMarket || "目标市场"
+  };
+}
+
+function isGenericReasoning(value) {
+  const text = String(value || "");
+
+  return (
+    !text.trim() ||
+    text.length < 18 ||
+    /Product Profile\s*\+?\s*AI|AI推理|动态章节推理|平台上下文|AI Engine output|模型推理生成|通用/.test(text)
+  );
+}
+
+function contextualDataSource(section, project, profile) {
+  const context = projectContext(project, profile);
+
+  return `用户输入（${context.product}、目标售价${context.price}、成本${context.cost}、${context.platforms}、${context.market}） + Product Profile（${context.category}、${context.scenarios}、${context.consumers}） + ${section.title || section.id} AI模型推理。`;
+}
+
+function contextualReasoning(section, project, profile) {
+  const context = projectContext(project, profile);
+
+  return `围绕${context.product}的${context.category}属性、${context.scenarios}场景、${context.consumers}人群、${context.price}价格带和${context.platforms}渠道，对${section.title || section.id}进行差异化推理，所有预计值需上线后用真实销量、广告、达人和竞品数据复核。`;
+}
+
+function enrichSection(section, project, profile) {
+  const enriched = { ...section };
+
+  if (isGenericReasoning(enriched.dataSource)) {
+    enriched.dataSource = contextualDataSource(enriched, project, profile);
+  }
+
+  if (isGenericReasoning(enriched.modelReasoning)) {
+    enriched.modelReasoning = contextualReasoning(enriched, project, profile);
+  }
+
+  enriched.moduleItems = (enriched.moduleItems || []).map((item) => {
+    const label = item.label || "结论";
+    const next = { ...item };
+
+    if (isGenericReasoning(next.basis)) {
+      next.basis = `${enriched.modelReasoning} 当前结论聚焦“${label}”，不是跨产品通用模板。`;
+    }
+
+    if (isGenericReasoning(next.value)) {
+      const context = projectContext(project, profile);
+      next.value = `预计${label}需要结合${context.product}的${context.category}属性、${context.scenarios}场景和${context.consumers}人群单独验证。`;
+    }
+
+    return next;
+  });
+
+  return enriched;
+}
+
 function riskLevelFromScore(riskScore) {
   if (riskScore >= 72) {
     return "low";
@@ -222,10 +295,11 @@ function normalizeAiEngineReport(raw, project, config) {
     riskScore: clampScore(raw.aiScore?.riskScore),
     overallScore: clampScore(raw.aiScore?.overallScore)
   };
-  const sections = raw.sections.map(toLegacySection);
+  const sections = raw.sections.map((section) => toLegacySection(enrichSection(section, project, raw.productProfile)));
+  const context = projectContext(project, raw.productProfile);
   const scoreInsight =
     raw.scoreInsight ||
-    `${config.provider} AI Intelligence Engine 基于 Product Profile 完成评分推理，建议优先用最高分维度设计测品动作，用最低分维度作为上线前复核重点。`;
+    `${config.provider} AI Intelligence Engine 结合${context.product}的${context.category}属性、${context.scenarios}场景、${context.consumers}人群和${context.platforms}渠道完成评分推理，建议优先验证最高分机会和最低分风险。`;
 
   return {
     status: "completed",
@@ -243,12 +317,12 @@ function normalizeAiEngineReport(raw, project, config) {
     },
     differentiationAnalysis: {
       scores: [
-        { label: "Demand Score", value: aiScore.demandScore, reason: `${config.provider} AI Engine output` },
-        { label: "Competition Score", value: aiScore.competitionScore, reason: `${config.provider} AI Engine output` },
-        { label: "Virality Score", value: aiScore.viralityScore, reason: `${config.provider} AI Engine output` },
-        { label: "Margin Score", value: aiScore.marginScore, reason: `${config.provider} AI Engine output` },
-        { label: "Risk Score", value: aiScore.riskScore, reason: `${config.provider} AI Engine output` },
-        { label: "Overall Score", value: aiScore.overallScore, reason: `${config.provider} AI Engine output` }
+        { label: "Demand Score", value: aiScore.demandScore, reason: `${context.market}市场中${context.product}的${context.category}需求、${context.scenarios}场景和${context.consumers}人群推理。` },
+        { label: "Competition Score", value: aiScore.competitionScore, reason: `${context.platforms}渠道下${context.category}竞品密度、价格带${context.price}和差异化空间推理。` },
+        { label: "Virality Score", value: aiScore.viralityScore, reason: `${context.product}在${context.scenarios}内容场景、${context.consumers}人群触发点和TikTok表达方式上的推理。` },
+        { label: "Margin Score", value: aiScore.marginScore, reason: `${context.price}售价、${context.cost}成本和${context.platforms}履约费用假设下的利润模型推理。` },
+        { label: "Risk Score", value: aiScore.riskScore, reason: `${context.category}的售后、物流、合规和平台限制风险推理。` },
+        { label: "Overall Score", value: aiScore.overallScore, reason: `${context.product}综合需求、内容、利润、竞品和风险后的AI模型判断。` }
       ],
       finalConclusion: raw.finalConclusion
     },
@@ -273,8 +347,8 @@ function normalizeAiEngineReport(raw, project, config) {
         { field: "平台", value: (project.platforms || []).join(", "), source: "用户输入", note: "用于渠道适配判断。" }
       ],
       aiInferredData: [
-        { field: "Product Profile", value: `${config.provider} inference`, basis: "产品输入与平台上下文", caution: "需要真实市场数据复核。" },
-        { field: "AI Score", value: `${config.provider} scoring`, basis: "Product Profile 和动态章节推理", caution: "不能作为确定销量承诺。" }
+        { field: "Product Profile", value: `${config.provider} inference`, basis: `${context.product}、${context.category}、${context.scenarios}、${context.consumers}和${context.platforms}组合推理。`, caution: "需要真实市场数据复核。" },
+        { field: "AI Score", value: `${config.provider} scoring`, basis: `${context.price}价格带、${context.cost}成本、${context.platforms}渠道和各章节差异化结论综合评分。`, caution: "不能作为确定销量承诺。" }
       ],
       humanAssumptions: [
         { field: "竞品链接", assumption: (project.competitorLinks || []).join(", ") || "未提供", owner: "运营", validationMethod: "人工核验链接产品是否为直接竞品。" }
@@ -299,6 +373,9 @@ function buildPrompt(project) {
 3. 每一个结论必须写明 Data Source 或 Model Reasoning。
 4. 如果没有真实外部数据，只能写 Model Reasoning，不能伪造市场事实。
 5. 输出必须是简体中文。
+6. 每个 section 的 dataSource、modelReasoning、findings、recommendations、risks 和 moduleItems 必须结合当前产品输入，不允许复用跨产品通用文案。
+7. 每个 moduleItem 的 value 和 basis 至少结合以下两个要素：产品类别、使用场景、消费人群、目标售价、成本、平台、目标市场、竞品链接、物流风险、合规风险。
+8. 禁止只写“Product Profile + AI推理”“平台上下文”“动态章节推理”等泛化来源；必须说明为什么这个产品会得出该结论。
 
 产品输入：
 ${JSON.stringify(project, null, 2)}
@@ -332,6 +409,8 @@ export async function generateAiEngineReport(project) {
   const modulePrompt = [
     buildPrompt(project),
     "scoreInsight 必须是一句简体中文点评，由 DeepSeek AI Intelligence Engine 基于 Product Profile 推理生成，只说明评分背后的核心判断，不要重复每个评分维度的通用说明。",
+    "所有章节和每一条 moduleItem 必须针对当前产品单独推理。不同产品不能复用相同的数据来源、相同风险描述、相同打法或相同评分理由。",
+    "dataSource 和 modelReasoning 必须写成该章节独立依据，至少包含产品品类、使用场景、目标人群、价格带、平台或竞品输入中的两个要素。",
     "sections 必须固定输出 10 个模块，id 和顺序必须完全如下：",
     "1. market_intelligence：市场分析（Market Intelligence），覆盖 TAM/SAM/SOM、Amazon/TikTok/Walmart销量预估、Google Trends近5年趋势、季节性、价格带、品牌集中度、TOP100竞品、店铺分布、利润率、预计GMV、预计ROI、市场进入评分、30/90/180/365天销量预测、备货建议、资金占用预测。",
     "2. creator_intelligence：达人画像（Creator Intelligence），覆盖达人类型、粉丝画像、年龄、性别、地区、消费能力、兴趣标签、爆款率、GMV、播放、CTR、CVR、佣金、竞品合作、合作难度、达人分层和百万GMV所需达人数量。",
@@ -343,7 +422,8 @@ export async function generateAiEngineReport(project) {
     "8. launch_plan：打品计划（Launch Plan），覆盖90天计划、每周视频数、达人、直播、广告预算、GMV目标、补货和放大规则。",
     "9. decision_center：AI决策中心（Decision Center），覆盖市场容量、利润空间、TikTok/Amazon/Walmart适配、达人适配、内容可玩性、合规风险、供应链成熟度、售后风险、推荐指数、是否立项、首批备货、达人合作、短视频产出、直播时长、30/90/365天GMV。",
     "10. profit_model：利润模型（Profit Model），必须按三列表格逻辑生成 moduleItems：商品出厂价、关税（Duty）、海运费（LCL）、港口及清关费、总落地成本、尾程配送费、燃油附加费、商品出仓成本、仓储费、广告成本、平台佣金、退货与损耗、运营费用合计、商品总成本、商品毛利、运营利润。每项 label 写项目名，basis 写计算逻辑，value 写费用预估或利润率。",
-    "每个 section 的 moduleItems 必须逐项生成中文业务内容。没有真实外部数据时，value 必须写成 预计/待验证口径，不能写成确定事实。"
+    "每个 section 的 moduleItems 必须逐项生成中文业务内容。没有真实外部数据时，value 必须写成 预计/待验证口径，不能写成确定事实。",
+    "每个 moduleItem 的 basis 必须解释该字段如何由当前产品的 Product Profile、价格成本、平台渠道、目标市场或竞品输入推导出来，不能写通用模板。"
   ].join("\n\n");
   const payload = await requestOpenAiResponses({
     model: config.model,
