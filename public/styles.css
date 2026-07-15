@@ -943,7 +943,7 @@ h1 {
 .profit-model-head,
 .profit-model-row {
   display: grid;
-  grid-template-columns: 0.9fr 2.2fr 0.8fr;
+  grid-template-columns: 0.9fr minmax(0, 2.1fr) minmax(140px, 0.8fr);
   gap: 12px;
   align-items: center;
 }
@@ -980,6 +980,21 @@ h1 {
   line-height: 1.5;
 }
 
+.profit-source-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: #075985;
+  background: #e0f2fe;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .profit-estimate-input {
   width: 100%;
   min-height: 32px;
@@ -991,6 +1006,11 @@ h1 {
   font: inherit;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.profit-estimate-input[readonly] {
+  color: #d97706;
+  cursor: default;
 }
 
 .profit-estimate-input:focus {
