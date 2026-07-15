@@ -621,7 +621,7 @@ function isGenericReportText(value) {
   return (
     !text.trim() ||
     text.length < 16 ||
-    /Product Profile\s*\+?\s*AI|AI推理|平台上下文|动态章节推理|AI Engine output|based on category|category average|通用|模板|需要结合|单独验证|单独判断/.test(text)
+    /Product Profile\s*\+?\s*AI|AI推理|平台上下文|动态章节推理|AI Engine output|based on category|category average|中高客单厨房小家电测算市场容量|10万美元GMV约需售出|100万美元GMV约需售出|通用|模板|需要结合|单独验证|单独判断/.test(text)
   );
 }
 
@@ -645,17 +645,40 @@ function millionGmvUnits(context) {
   return Math.ceil(1000000 / contextNumber(context.price, 179)).toLocaleString("en-US");
 }
 
-function directFallbackConclusion(module, label, context) {
+function fallbackVariant(items, index) {
+  return items[index % items.length];
+}
+
+function directFallbackConclusion(module, label, context, index = 0) {
   const type = module.type;
   const margin = marginText(context);
   const units = millionGmvUnits(context);
 
   if (type === "market_intelligence") {
-    if (textIncludesAny(label, ["tam", "sam", "som", "市场规模"])) return `${context.market}${context.category}存在家庭自制、健康饮品和夏季场景需求，${context.price}价位应按中高客单厨房小家电测算市场容量。`;
-    if (textIncludesAny(label, ["销量", "gmv"])) return `按${context.price}售价测算，10万美元GMV约需售出${Math.ceil(100000 / contextNumber(context.price, 179))}台；100万美元GMV约需售出${units}台。`;
-    if (textIncludesAny(label, ["roi", "利润"])) return `出厂成本${context.cost}、售价${context.price}下，裸毛利率约${margin}，可承受达人佣金和广告测试，但需控制尾程配送。`;
-    if (textIncludesAny(label, ["备货", "资金"])) return `首批建议小批量测品，按7-14天内容反馈决定补货；高客单产品优先防止库存资金占用。`;
-    return `${context.product}市场机会集中在${context.scenarios}，核心验证指标是搜索热度、达人转化率、同价位竞品销量和广告ROAS。`;
+    if (textIncludesAny(label, ["tam", "总可用"])) return `TAM结论：${context.market}${context.category}覆盖家庭厨房、健康饮品和夏季消暑需求，适合作为大盘容量判断，不直接等同首年销量。`;
+    if (textIncludesAny(label, ["sam", "可服务"])) return `SAM结论：可服务市场应聚焦TikTok、Amazon和Walmart线上用户，优先计算愿意购买${context.price}厨房电器的人群。`;
+    if (textIncludesAny(label, ["som", "可获得"])) return `SOM结论：首阶段可获得市场来自达人内容转化和Amazon搜索承接，建议先按小批量测品份额评估。`;
+    if (textIncludesAny(label, ["amazon"])) return `Amazon销量结论：Amazon更适合承接搜索型需求，重点看“ice crusher / smoothie maker / shaved ice machine”同价位Listing转化。`;
+    if (textIncludesAny(label, ["tiktok"])) return `TikTok销量结论：TikTok增量来自视觉演示内容，出冰效果、夏日饮品和健身代餐场景决定短期爆发。`;
+    if (textIncludesAny(label, ["walmart"])) return `Walmart销量结论：Walmart适合做价格和家庭厨房场景承接，但爆发性弱于TikTok，适合作为补充渠道。`;
+    if (textIncludesAny(label, ["google", "trends", "趋势"])) return `趋势结论：搜索趋势应重点观察5-8月夏季饮品高峰，以及健康代餐、家庭聚会内容是否同步升温。`;
+    if (textIncludesAny(label, ["季节"])) return `季节性结论：${context.product}旺季集中在春末到夏季，备货和达人排期应提前4-6周启动。`;
+    if (textIncludesAny(label, ["价格带", "价格"])) return `价格带结论：${context.price}属于中高客单，必须用更强功率、口感、耐用性和售后承诺支撑溢价。`;
+    if (textIncludesAny(label, ["品牌集中"])) return `品牌集中度结论：若头部品牌评价数量高但内容表达弱，TikTok仍可通过场景演示切入。`;
+    if (textIncludesAny(label, ["top100", "竞品"])) return `TOP竞品结论：优先拆解同价位竞品的差评、出冰效果、噪音和清洗问题，用改进点做卖点。`;
+    if (textIncludesAny(label, ["店铺"])) return `店铺分布结论：若竞品以Amazon店铺为主，TikTok Shop可用达人内容降低新品冷启动成本。`;
+    if (textIncludesAny(label, ["利润率", "利润"])) return `利润率结论：出厂成本${context.cost}、售价${context.price}下裸毛利约${margin}，核心压力来自尾程、广告和退货。`;
+    if (textIncludesAny(label, ["gmv"])) return `GMV结论：按${context.price}售价测算，100万美元GMV需要约${units}台销量，应拆成达人、直播和搜索三条渠道目标。`;
+    if (textIncludesAny(label, ["roi"])) return `ROI结论：测品期先以达人佣金和小额广告验证ROAS，未达到盈亏线前不建议重仓库存。`;
+    if (textIncludesAny(label, ["评分", "进入"])) return `市场进入结论：可进入但需谨慎，进入门槛不是需求，而是内容转化、产品体验和售后稳定性。`;
+    if (textIncludesAny(label, ["30", "90", "180", "365", "预测"])) return `销量预测结论：30天看内容点击和加购，90天看达人复投，180天后再判断是否扩展Amazon和Walmart库存。`;
+    if (textIncludesAny(label, ["备货"])) return `备货结论：首批建议按300-800台测品，等达人视频转化、退货率和广告ROAS达标后再补货。`;
+    if (textIncludesAny(label, ["资金"])) return `资金占用结论：${context.price}客单和电器物流会放大库存压力，现金流模型必须预留45-60天周转。`;
+    return fallbackVariant([
+      `${context.product}市场验证优先看同价位竞品销量、搜索词热度和TikTok视频完播率。`,
+      `${context.product}渠道策略应区分TikTok内容种草、Amazon搜索承接和Walmart家庭消费补充。`,
+      `${context.product}测品成败取决于夏季场景内容能否覆盖${context.consumers}并压低退货率。`
+    ], index);
   }
 
   if (type === "creator_intelligence") {
@@ -669,7 +692,11 @@ function directFallbackConclusion(module, label, context) {
     if (textIncludesAny(label, ["佣金"])) return `平均佣金建议设为15%-20%；${context.price}客单价可支撑达人测评成本，但需控制样品和物流费用。`;
     if (textIncludesAny(label, ["合作难度"])) return "合作难度预计中等：厨房和健康类达人可接受样品测评，但需要提供明确佣金、卖点素材和使用脚本。";
     if (textIncludesAny(label, ["百万", "GMV"])) return `按${context.price}售价测算，100万美元GMV约需售出${units}台；建议准备120-200位达人池分层测试。`;
-    return "达人策略以中腰部厨房、健康饮品和家庭生活达人为主，先测内容转化，再放大高ROI达人。";
+    return fallbackVariant([
+      "达人策略以中腰部厨房、健康饮品和家庭生活达人为主，先测内容转化，再放大高ROI达人。",
+      "达人分层建议先用长尾达人验证脚本，再用腰部达人放大销量，头部达人只在转化稳定后合作。",
+      "达人内容必须展示真实制作过程，单纯口播不适合厨房电器类产品。"
+    ], index);
   }
 
   if (type === "consumer_intelligence") {
@@ -677,7 +704,11 @@ function directFallbackConclusion(module, label, context) {
     if (textIncludesAny(label, ["收入"])) return `${context.price}价位更适合家庭年收入$75k+用户，低价敏感人群转化阻力较高。`;
     if (textIncludesAny(label, ["购买", "原因"])) return `购买理由是家庭自制冰沙/奶昔、健康代餐、聚会饮品和减少外购饮品成本。`;
     if (textIncludesAny(label, ["痛点"])) return "核心痛点是机器清洗麻烦、噪音、碎冰效果不稳定、体积占地和售后维修成本。";
-    return `${context.product}目标用户应锁定健康饮品爱好者、年轻家庭和重视厨房效率的人群。`;
+    return fallbackVariant([
+      `${context.product}目标用户应锁定健康饮品爱好者、年轻家庭和重视厨房效率的人群。`,
+      `用户购买前会重点比较碎冰效果、清洗难度、噪音和${context.price}价格合理性。`,
+      `用户转化内容应分别覆盖健身代餐、儿童饮品和家庭聚会三类动机。`
+    ], index);
   }
 
   if (type === "video_ai") {
@@ -685,7 +716,11 @@ function directFallbackConclusion(module, label, context) {
     if (textIncludesAny(label, ["脚本", "30", "45", "60"])) return "脚本结构：3秒展示冰块变沙冰，10秒对比外卖饮品成本，15秒展示清洗和口感，结尾引导下单。";
     if (textIncludesAny(label, ["分镜", "镜头"])) return "分镜优先拍透明杯出冰、近景质地、儿童/健身/派对三场景切换，避免只拍机器静物。";
     if (textIncludesAny(label, ["bgm", "字幕"])) return "BGM选择夏日、清爽、快节奏音乐；字幕突出“省钱、健康、30秒、家庭可用”。";
-    return `${context.product}短视频核心是强视觉变化和场景对比，第一屏必须出现冰块变沙冰的结果。`;
+    return fallbackVariant([
+      `${context.product}短视频核心是强视觉变化和场景对比，第一屏必须出现冰块变沙冰的结果。`,
+      `短视频应把${context.scenarios}拆成多个可拍脚本，避免所有视频只展示机器外观。`,
+      `内容测试先跑3秒钩子、成品质地和清洗便利三个变量。`
+    ], index);
   }
 
   if (type === "live_ai") {
@@ -693,21 +728,33 @@ function directFallbackConclusion(module, label, context) {
     if (textIncludesAny(label, ["coupon", "优惠", "抽奖"])) return "优惠节奏建议每30分钟发Coupon，配合样品抽奖提升停留，但折扣不能压穿毛利。";
     if (textIncludesAny(label, ["演示"])) return "直播必须现场演示冰块、牛奶、水果三类原料，证明碎冰速度、口感和清洗便利性。";
     if (textIncludesAny(label, ["问题", "回答"])) return "高频问答聚焦能否碎冰、噪音多大、是否好清洗、保修多久、适合几人家庭。";
-    return `${context.product}直播应以即时演示建立信任，用限时券和套餐推动${context.price}客单成交。`;
+    return fallbackVariant([
+      `${context.product}直播应以即时演示建立信任，用限时券和套餐推动${context.price}客单成交。`,
+      `直播间每轮必须重复碎冰效果、清洗方式、保修承诺和优惠截止时间。`,
+      `直播转化重点不是讲参数，而是连续展示不同饮品成品。`
+    ], index);
   }
 
   if (type === "comment_ai") {
     if (textIncludesAny(label, ["喜欢", "好评"])) return "好评卖点应围绕出冰细腻、饮品口感、家庭聚会好用和减少外购饮品成本。";
     if (textIncludesAny(label, ["退货", "差评"])) return "差评风险集中在噪音、清洗、碎冰不均匀、机器发热和售后响应慢。";
     if (textIncludesAny(label, ["文案"])) return "营销文案应强调“比外卖饮品更省钱、比普通搅拌机更适合碎冰、夏季家庭高频使用”。";
-    return `${context.product}评论分析要把正向卖点转成视频脚本，把差评风险转成详情页FAQ和售后承诺。`;
+    return fallbackVariant([
+      `${context.product}评论分析要把正向卖点转成视频脚本，把差评风险转成详情页FAQ和售后承诺。`,
+      `评论抓取应优先看噪音、清洗、耐用性和碎冰效果，这些会直接影响退货。`,
+      `差评中的使用门槛要转成说明书、直播答疑和售后话术。`
+    ], index);
   }
 
   if (type === "compliance_ai") {
     if (textIncludesAny(label, ["认证", "fcc", "etl", "ul", "prop", "cpsia"])) return "厨房电器上线前重点准备电气安全、食品接触材料、说明书警示和平台类目资质材料。";
     if (textIncludesAny(label, ["违规", "风险"])) return "合规风险主要来自夸大碎冰效果、虚假健康功效、图片版权和电器安全声明。";
     if (textIncludesAny(label, ["知识产权", "专利", "商标"])) return "需核查外观结构、刀头设计、品牌词和竞品图片版权，避免直接复制爆款素材。";
-    return `${context.product}属于厨房电器，合规重点是电器安全、食品接触、宣传边界和平台素材版权。`;
+    return fallbackVariant([
+      `${context.product}属于厨房电器，合规重点是电器安全、食品接触、宣传边界和平台素材版权。`,
+      `合规文案不能暗示医疗或减肥功效，健康代餐只能作为使用场景表达。`,
+      `上线前必须核查插头、电压、说明书警示和平台厨房电器类目要求。`
+    ], index);
   }
 
   if (type === "launch_plan") {
@@ -715,14 +762,22 @@ function directFallbackConclusion(module, label, context) {
     if (textIncludesAny(label, ["week 2", "第二周"])) return "第2周放大点击率最高的3类场景，达人池扩到50-80位，并开始小预算广告测试。";
     if (textIncludesAny(label, ["week 3", "第三周", "week 4", "第四周"])) return "第3-4周只放大ROAS达标内容，若退货和差评可控，再进入补货和直播加时。";
     if (textIncludesAny(label, ["gmv"])) return `30天GMV目标建议从$30k-$80k起步；达到100万美元GMV需约${units}台销量。`;
-    return `${context.product}打品节奏应先测内容和售后，再放大达人、广告和库存。`;
+    return fallbackVariant([
+      `${context.product}打品节奏应先测内容和售后，再放大达人、广告和库存。`,
+      `90天计划要把达人寄样、直播测试、广告放量和补货节点分开管理。`,
+      `未验证退货率前不建议大批量压货，先用内容数据决定补货节奏。`
+    ], index);
   }
 
   if (type === "decision_center") {
     if (textIncludesAny(label, ["立项", "建议"])) return `建议谨慎立项：${context.price}客单价和约${margin}裸毛利有测试空间，但必须先验证内容转化和退货率。`;
     if (textIncludesAny(label, ["备货"])) return "首批备货建议控制在300-800台，等达人视频转化、退货率和广告ROAS达标后再补货。";
     if (textIncludesAny(label, ["推荐", "指数"])) return "推荐指数应由内容传播、毛利空间和售后风险共同决定；当前优先做小批量测品。";
-    return `${context.product}决策结论是可测但不宜重仓，关键看TikTok内容转化、Amazon承接和售后稳定性。`;
+    return fallbackVariant([
+      `${context.product}决策结论是可测但不宜重仓，关键看TikTok内容转化、Amazon承接和售后稳定性。`,
+      `如果达人视频点击高但转化低，应优先优化价格、赠品和详情页，而不是扩大投流。`,
+      `如果退货率超过预期，应暂停补货并优先处理噪音、清洗和碎冰效果问题。`
+    ], index);
   }
 
   if (type === "profit_model") {
@@ -730,10 +785,18 @@ function directFallbackConclusion(module, label, context) {
     if (textIncludesAny(label, ["关税"])) return "关税先按小家电常见税率区间估算，实际以HTS编码和清关资料为准。";
     if (textIncludesAny(label, ["广告", "佣金"])) return "广告和平台佣金需要合计控制在售价的25%-35%以内，否则运营利润会被压缩。";
     if (textIncludesAny(label, ["毛利", "利润"])) return `按${context.price}售价和${context.cost}成本，利润模型必须优先压低物流、广告和退货损耗。`;
-    return `${context.product}利润模型核心是售价${context.price}能否覆盖出厂、关税、海运、尾程、佣金、广告和售后损耗。`;
+    return fallbackVariant([
+      `${context.product}利润模型核心是售价${context.price}能否覆盖出厂、关税、海运、尾程、佣金、广告和售后损耗。`,
+      `利润敏感项优先看尾程配送、广告占比和退货损耗，三项合计过高会吞掉裸毛利。`,
+      `若要维持正向利润，应把佣金、广告和优惠控制在可承受毛利范围内。`
+    ], index);
   }
 
-  return `结论：${context.product}在${context.market}的${module.title}应优先围绕${label}制定动作；按${context.price}售价、${context.cost}成本和${context.platforms}渠道测算，该字段会直接影响内容转化、利润或投放节奏。`;
+  return fallbackVariant([
+    `结论：${context.product}在${context.market}的${module.title}应围绕${label}制定独立动作，不能复用其他字段判断。`,
+    `结论：${label}应结合${context.price}售价、${context.cost}成本和${context.platforms}渠道单独评估投入产出。`,
+    `结论：${label}会影响${context.product}的内容转化、库存节奏或售后成本，需要单独设定指标。`
+  ], index);
 }
 
 function productSpecificValue(module, label, section, index) {
@@ -749,7 +812,7 @@ function productSpecificValue(module, label, section, index) {
     return sourceValue;
   }
 
-  return directFallbackConclusion(module, label, context);
+  return directFallbackConclusion(module, label, context, index);
 }
 
 function productSpecificBasis(label, section) {
@@ -764,9 +827,9 @@ function productSpecificBasis(label, section) {
 
 function buildLaunchModuleItems(module, section) {
   if (section?.moduleItems?.length) {
-    return section.moduleItems.map((item) => ({
+    return section.moduleItems.map((item, index) => ({
       ...item,
-      value: isGenericReportText(item.value) ? productSpecificValue(module, item.label || "结论", section, 0) : item.value,
+      value: isGenericReportText(item.value) ? productSpecificValue(module, item.label || "结论", section, index) : item.value,
       basis: isGenericReportText(item.basis) ? productSpecificBasis(item.label || "结论", section) : item.basis
     }));
   }
