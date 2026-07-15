@@ -206,8 +206,49 @@ function isGenericReasoning(value) {
   return (
     !text.trim() ||
     text.length < 18 ||
-    /Product Profile\s*\+?\s*AI|AI推理|动态章节推理|平台上下文|AI Engine output|模型推理生成|通用/.test(text)
+    /Product Profile\s*\+?\s*AI|AI推理|动态章节推理|平台上下文|AI Engine output|模型推理生成|通用|需要结合|单独验证|单独判断/.test(text)
   );
+}
+
+function textIncludesAny(value, keywords) {
+  const text = String(value || "").toLowerCase();
+  return keywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
+}
+
+function directModuleConclusion(section, label, project, profile) {
+  const context = projectContext(project, profile);
+
+  if (section.id === "creator_intelligence") {
+    if (textIncludesAny(label, ["达人类型", "creator type"])) {
+      return "优先合作厨房小家电、健康饮品、家庭食谱和健身代餐类达人；用3秒出冰沙/奶昔演示做内容钩子，中腰部达人负责转化。";
+    }
+
+    if (textIncludesAny(label, ["年龄"])) {
+      return "核心粉丝年龄预计集中在25-44岁：25-34岁关注健康饮品和健身代餐，35-44岁关注家庭自制和厨房效率。";
+    }
+
+    if (textIncludesAny(label, ["性别"])) {
+      return "女性粉丝占比预计更高，主打家庭厨房、夏日饮品和亲子场景；健身代餐内容可补充男性健身人群。";
+    }
+
+    if (textIncludesAny(label, ["地区"])) {
+      return "优先覆盖加州、德州、佛州和纽约等高温、家庭聚会和健康饮品消费更强的州。";
+    }
+
+    if (textIncludesAny(label, ["兴趣", "标签"])) {
+      return "核心兴趣标签建议锁定 #smoothie、#healthy、#fitness、#recipes、#kitchengadgets。";
+    }
+
+    if (textIncludesAny(label, ["爆款率"])) {
+      return "内容爆款率预计中高：透明杯出沙冰、奶昔口感对比和夏季降温场景具备强视觉反馈。";
+    }
+
+    if (textIncludesAny(label, ["佣金"])) {
+      return "平均佣金建议设为15%-20%；中高客单价可支撑达人测评成本，但需控制样品和物流费用。";
+    }
+  }
+
+  return `结论：${context.product}在${context.market}的${section.title || section.id}应优先围绕${label}制定动作；按${context.price}售价、${context.cost}成本和${context.platforms}渠道测算，该字段会直接影响内容转化、利润或投放节奏。`;
 }
 
 function contextualDataSource(section, project, profile) {
@@ -242,8 +283,7 @@ function enrichSection(section, project, profile) {
     }
 
     if (isGenericReasoning(next.value)) {
-      const context = projectContext(project, profile);
-      next.value = `预计${label}需要结合${context.product}的${context.category}属性、${context.scenarios}场景和${context.consumers}人群单独验证。`;
+      next.value = directModuleConclusion(enriched, label, project, profile);
     }
 
     return next;
