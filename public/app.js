@@ -101,7 +101,7 @@ const LAUNCH_MODULES = [
     type: "profit_model",
     title: "利润模型",
     subtitle: "Profit Model",
-    fallbackItems: ["商品出厂价", "关税（Duty）", "海运费（LCL）", "港口及清关费", "总落地成本", "尾程配送费", "燃油附加费", "商品出仓成本", "仓储费", "广告成本", "平台佣金", "达人佣金", "退货与损耗", "运营费用合计", "商品总成本", "价格上行因素", "价格下行因素"]
+    fallbackItems: ["商品出厂价", "关税（Duty）", "海运费（LCL）", "港口及清关费", "总落地成本", "尾程配送费", "燃油附加费", "商品出仓成本", "仓储费", "广告成本", "平台佣金", "达人佣金", "退货与损耗", "运营费用合计", "商品总成本", "商品毛利", "运营利润"]
   }
 ];
 
@@ -984,6 +984,8 @@ function buildProfitModelRows(items, report) {
   const outboundCost = landedCost + lastMile + fuel;
   const operatingCost = warehouse + adCost + platformCommission + creatorCommission + returnLoss;
   const totalCost = outboundCost + operatingCost;
+  const grossMargin = salePrice > 0 ? ((salePrice - outboundCost) / salePrice) * 100 : 0;
+  const operatingMargin = salePrice > 0 ? ((salePrice - totalCost) / salePrice) * 100 : 0;
 
   return [
     { key: "factoryCost", label: "商品出厂价", source: "用户输入", formula: "用户输入：供应商报价或项目成本，用于后续所有成本推导。", estimate: profitCurrency(factoryCost), editable: true },
@@ -1001,8 +1003,8 @@ function buildProfitModelRows(items, report) {
     { key: "returnLoss", label: "退货与损耗", source: "市场估算", formula: "市场估算：按退货率、仓返、折旧和售后损耗估算。", estimate: profitCurrency(returnLoss), editable: true },
     { key: "operatingCost", label: "运营费用合计", source: "公式推导", formula: "公式推导：仓储费 + 广告成本 + 平台佣金 + 达人佣金 + 退货与损耗。", estimate: profitCurrency(operatingCost), editable: false },
     { key: "totalCost", label: "商品总成本", source: "公式推导", formula: "公式推导：商品出仓成本 + 运营费用合计。", estimate: profitCurrency(totalCost), editable: false },
-    { key: "priceUpFactors", label: "价格上行因素", source: "因素分析", formula: "影响价格上涨：关税上调、海运旺季、尾程费上涨、广告竞价变贵、达人佣金提高、退货损耗增加。", estimate: "可能推高售价或压缩利润", editable: false },
-    { key: "priceDownFactors", label: "价格下行因素", source: "因素分析", formula: "影响价格下调：竞品降价、平台促销、库存积压、ROAS下降、转化率低、渠道补贴减少。", estimate: "可能迫使降价促销", editable: false }
+    { key: "grossMargin", label: "商品毛利", source: "公式推导", formula: "公式推导：（售价 - 商品出仓成本）/ 售价 × 100%。", estimate: profitPercent(grossMargin), editable: false },
+    { key: "operatingMargin", label: "运营利润", source: "公式推导", formula: "公式推导：（售价 - 商品总成本）/ 售价 × 100%。", estimate: profitPercent(operatingMargin), editable: false }
   ];
 }
 
@@ -1053,13 +1055,15 @@ function recalculateProfitModelTable() {
   const outboundCost = landedCost + value("lastMile") + value("fuel");
   const operatingCost = value("warehouse") + value("adCost") + value("platformCommission") + value("creatorCommission") + value("returnLoss");
   const totalCost = outboundCost + operatingCost;
+  const grossMargin = salePrice > 0 ? ((salePrice - outboundCost) / salePrice) * 100 : 0;
+  const operatingMargin = salePrice > 0 ? ((salePrice - totalCost) / salePrice) * 100 : 0;
   const updates = {
     landedCost: profitCurrency(landedCost),
     outboundCost: profitCurrency(outboundCost),
     operatingCost: profitCurrency(operatingCost),
     totalCost: profitCurrency(totalCost),
-    priceUpFactors: "可能推高售价或压缩利润",
-    priceDownFactors: "可能迫使降价促销"
+    grossMargin: profitPercent(grossMargin),
+    operatingMargin: profitPercent(operatingMargin)
   };
 
   Object.entries(updates).forEach(([key, nextValue]) => {

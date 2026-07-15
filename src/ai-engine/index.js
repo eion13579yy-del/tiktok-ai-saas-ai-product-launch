@@ -632,7 +632,7 @@ export async function generateAiEngineReport(project) {
     "7. compliance_ai：风险合规（Compliance AI），覆盖 TikTok违规、医疗宣称、夸大宣传、品类限制、知识产权、专利、商标、版权、FCC/ETL/UL/Prop 65/CPSIA/电池运输/平台资质和风险评分。",
     "8. launch_plan：打品计划（Launch Plan），覆盖90天计划、每周视频数、达人、直播、广告预算、GMV目标、补货和放大规则。",
     "9. decision_center：AI决策中心（Decision Center），覆盖市场容量、利润空间、TikTok/Amazon/Walmart适配、达人适配、内容可玩性、合规风险、供应链成熟度、售后风险、推荐指数、是否立项、首批备货、达人合作、短视频产出、直播时长、30/90/365天GMV。",
-    "10. profit_model：利润模型（Profit Model），必须按三列表格逻辑生成 moduleItems：商品出厂价、关税（Duty）、海运费（LCL）、港口及清关费、总落地成本、尾程配送费、燃油附加费、商品出仓成本、仓储费、广告成本、平台佣金、达人佣金、退货与损耗、运营费用合计、商品总成本、价格上行因素、价格下行因素。每项 label 写项目名，basis 写计算逻辑或影响因素，value 写费用预估或因素结论。",
+    "10. profit_model：利润模型（Profit Model），必须按三列表格逻辑生成 moduleItems：商品出厂价、关税（Duty）、海运费（LCL）、港口及清关费、总落地成本、尾程配送费、燃油附加费、商品出仓成本、仓储费、广告成本、平台佣金、达人佣金、退货与损耗、运营费用合计、商品总成本、商品毛利、运营利润。每项 label 写项目名，basis 写计算逻辑，value 写费用预估或利润率。",
     "每个 section 的 moduleItems 必须逐项生成中文业务内容，每个模块控制在 6-10 项，避免长篇文章。没有真实外部数据时，value 必须写成 预计/待验证口径，不能写成确定事实。",
     "每个 moduleItem 的 basis 必须解释该字段如何由当前产品的 Product Profile、价格成本、平台渠道、目标市场或竞品输入推导出来，不能写通用模板。"
   ].join("\n\n");
