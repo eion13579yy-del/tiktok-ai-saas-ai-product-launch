@@ -621,7 +621,7 @@ function isGenericReportText(value) {
   return (
     !text.trim() ||
     text.length < 16 ||
-    /Product Profile\s*\+?\s*AI|AI推理|平台上下文|动态章节推理|AI Engine output|通用|模板|需要结合|单独验证|单独判断/.test(text)
+    /Product Profile\s*\+?\s*AI|AI推理|平台上下文|动态章节推理|AI Engine output|based on category|category average|通用|模板|需要结合|单独验证|单独判断/.test(text)
   );
 }
 
@@ -630,56 +630,107 @@ function textIncludesAny(value, keywords) {
   return keywords.some((keyword) => text.includes(String(keyword).toLowerCase()));
 }
 
-function creatorIntelligenceConclusion(label, context) {
-  if (textIncludesAny(label, ["达人类型", "creator type"])) {
-    return `优先合作厨房小家电、健康饮品、家庭食谱和健身代餐类达人；用3秒出冰沙/奶昔演示做内容钩子，中腰部达人负责转化。`;
-  }
+function contextNumber(value, fallback) {
+  const numeric = Number(String(value || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
 
-  if (textIncludesAny(label, ["年龄"])) {
-    return `核心粉丝年龄预计集中在25-44岁：25-34岁关注健康饮品和健身代餐，35-44岁关注家庭自制和厨房效率。`;
-  }
+function marginText(context) {
+  const price = contextNumber(context.price, 179);
+  const cost = contextNumber(context.cost, 61);
+  return `${Math.round(((price - cost) / price) * 100)}%`;
+}
 
-  if (textIncludesAny(label, ["性别"])) {
-    return `粉丝性别预计女性占比更高，适合家庭厨房、夏日饮品和亲子场景；健身代餐内容可补充男性健身人群。`;
-  }
-
-  if (textIncludesAny(label, ["地区"])) {
-    return `优先覆盖加州、德州、佛州和纽约等高温、家庭聚会和健康饮品消费更强的州。`;
-  }
-
-  if (textIncludesAny(label, ["消费能力"])) {
-    return `${context.price}售价属于中高客单，建议匹配家庭收入$75k+、愿意为厨房效率和健康饮品付费的人群。`;
-  }
-
-  if (textIncludesAny(label, ["兴趣", "标签"])) {
-    return `核心兴趣标签建议锁定 #smoothie、#healthy、#fitness、#recipes、#kitchengadgets。`;
-  }
-
-  if (textIncludesAny(label, ["爆款率"])) {
-    return `内容爆款率预计中高：透明杯出沙冰、奶昔口感对比和夏季降温场景具备强视觉反馈。`;
-  }
-
-  if (textIncludesAny(label, ["佣金"])) {
-    return `平均佣金建议设为15%-20%；${context.price}客单价可支撑达人测评成本，但需控制样品和物流费用。`;
-  }
-
-  if (textIncludesAny(label, ["合作难度"])) {
-    return `合作难度预计中等：厨房和健康类达人可接受样品测评，但需要提供明确佣金、卖点素材和使用脚本。`;
-  }
-
-  if (textIncludesAny(label, ["百万", "GMV"])) {
-    return `按${context.price}售价测算，100万美元GMV约需售出${Math.ceil(1000000 / (Number(String(context.price).replace(/[^0-9.]/g, "")) || 179))}台；建议准备120-200位达人池分层测试。`;
-  }
-
-  return "";
+function millionGmvUnits(context) {
+  return Math.ceil(1000000 / contextNumber(context.price, 179)).toLocaleString("en-US");
 }
 
 function directFallbackConclusion(module, label, context) {
-  if (module.type === "creator_intelligence") {
-    const creatorConclusion = creatorIntelligenceConclusion(label, context);
-    if (creatorConclusion) {
-      return creatorConclusion;
-    }
+  const type = module.type;
+  const margin = marginText(context);
+  const units = millionGmvUnits(context);
+
+  if (type === "market_intelligence") {
+    if (textIncludesAny(label, ["tam", "sam", "som", "市场规模"])) return `${context.market}${context.category}存在家庭自制、健康饮品和夏季场景需求，${context.price}价位应按中高客单厨房小家电测算市场容量。`;
+    if (textIncludesAny(label, ["销量", "gmv"])) return `按${context.price}售价测算，10万美元GMV约需售出${Math.ceil(100000 / contextNumber(context.price, 179))}台；100万美元GMV约需售出${units}台。`;
+    if (textIncludesAny(label, ["roi", "利润"])) return `出厂成本${context.cost}、售价${context.price}下，裸毛利率约${margin}，可承受达人佣金和广告测试，但需控制尾程配送。`;
+    if (textIncludesAny(label, ["备货", "资金"])) return `首批建议小批量测品，按7-14天内容反馈决定补货；高客单产品优先防止库存资金占用。`;
+    return `${context.product}市场机会集中在${context.scenarios}，核心验证指标是搜索热度、达人转化率、同价位竞品销量和广告ROAS。`;
+  }
+
+  if (type === "creator_intelligence") {
+    if (textIncludesAny(label, ["达人类型", "creator type"])) return "优先合作厨房小家电、健康饮品、家庭食谱和健身代餐类达人；用3秒出冰沙/奶昔演示做内容钩子，中腰部达人负责转化。";
+    if (textIncludesAny(label, ["年龄"])) return "核心粉丝年龄预计集中在25-44岁：25-34岁关注健康饮品和健身代餐，35-44岁关注家庭自制和厨房效率。";
+    if (textIncludesAny(label, ["性别"])) return "女性粉丝占比预计更高，适合家庭厨房、夏日饮品和亲子场景；健身代餐内容可补充男性健身人群。";
+    if (textIncludesAny(label, ["地区"])) return "优先覆盖加州、德州、佛州和纽约等高温、家庭聚会和健康饮品消费更强的州。";
+    if (textIncludesAny(label, ["消费能力"])) return `${context.price}售价属于中高客单，建议匹配家庭收入$75k+、愿意为厨房效率和健康饮品付费的人群。`;
+    if (textIncludesAny(label, ["兴趣", "标签"])) return "核心兴趣标签建议锁定 #smoothie、#healthy、#fitness、#recipes、#kitchengadgets。";
+    if (textIncludesAny(label, ["爆款率"])) return "内容爆款率预计中高：透明杯出沙冰、奶昔口感对比和夏季降温场景具备强视觉反馈。";
+    if (textIncludesAny(label, ["佣金"])) return `平均佣金建议设为15%-20%；${context.price}客单价可支撑达人测评成本，但需控制样品和物流费用。`;
+    if (textIncludesAny(label, ["合作难度"])) return "合作难度预计中等：厨房和健康类达人可接受样品测评，但需要提供明确佣金、卖点素材和使用脚本。";
+    if (textIncludesAny(label, ["百万", "GMV"])) return `按${context.price}售价测算，100万美元GMV约需售出${units}台；建议准备120-200位达人池分层测试。`;
+    return "达人策略以中腰部厨房、健康饮品和家庭生活达人为主，先测内容转化，再放大高ROI达人。";
+  }
+
+  if (type === "consumer_intelligence") {
+    if (textIncludesAny(label, ["年龄"])) return "核心用户为25-44岁家庭用户和健康生活人群，购买动机集中在自制饮品、效率和夏季消暑。";
+    if (textIncludesAny(label, ["收入"])) return `${context.price}价位更适合家庭年收入$75k+用户，低价敏感人群转化阻力较高。`;
+    if (textIncludesAny(label, ["购买", "原因"])) return `购买理由是家庭自制冰沙/奶昔、健康代餐、聚会饮品和减少外购饮品成本。`;
+    if (textIncludesAny(label, ["痛点"])) return "核心痛点是机器清洗麻烦、噪音、碎冰效果不稳定、体积占地和售后维修成本。";
+    return `${context.product}目标用户应锁定健康饮品爱好者、年轻家庭和重视厨房效率的人群。`;
+  }
+
+  if (type === "video_ai") {
+    if (textIncludesAny(label, ["选题"])) return "爆款选题围绕“30秒做出店铺同款冰沙”“夏天不用出门买奶昔”“健身代餐一杯搞定”。";
+    if (textIncludesAny(label, ["脚本", "30", "45", "60"])) return "脚本结构：3秒展示冰块变沙冰，10秒对比外卖饮品成本，15秒展示清洗和口感，结尾引导下单。";
+    if (textIncludesAny(label, ["分镜", "镜头"])) return "分镜优先拍透明杯出冰、近景质地、儿童/健身/派对三场景切换，避免只拍机器静物。";
+    if (textIncludesAny(label, ["bgm", "字幕"])) return "BGM选择夏日、清爽、快节奏音乐；字幕突出“省钱、健康、30秒、家庭可用”。";
+    return `${context.product}短视频核心是强视觉变化和场景对比，第一屏必须出现冰块变沙冰的结果。`;
+  }
+
+  if (type === "live_ai") {
+    if (textIncludesAny(label, ["sop", "2小时"])) return "2小时直播按“开场出杯-场景演示-优惠解释-答疑-限时逼单”循环，每20分钟重复一次核心卖点。";
+    if (textIncludesAny(label, ["coupon", "优惠", "抽奖"])) return "优惠节奏建议每30分钟发Coupon，配合样品抽奖提升停留，但折扣不能压穿毛利。";
+    if (textIncludesAny(label, ["演示"])) return "直播必须现场演示冰块、牛奶、水果三类原料，证明碎冰速度、口感和清洗便利性。";
+    if (textIncludesAny(label, ["问题", "回答"])) return "高频问答聚焦能否碎冰、噪音多大、是否好清洗、保修多久、适合几人家庭。";
+    return `${context.product}直播应以即时演示建立信任，用限时券和套餐推动${context.price}客单成交。`;
+  }
+
+  if (type === "comment_ai") {
+    if (textIncludesAny(label, ["喜欢", "好评"])) return "好评卖点应围绕出冰细腻、饮品口感、家庭聚会好用和减少外购饮品成本。";
+    if (textIncludesAny(label, ["退货", "差评"])) return "差评风险集中在噪音、清洗、碎冰不均匀、机器发热和售后响应慢。";
+    if (textIncludesAny(label, ["文案"])) return "营销文案应强调“比外卖饮品更省钱、比普通搅拌机更适合碎冰、夏季家庭高频使用”。";
+    return `${context.product}评论分析要把正向卖点转成视频脚本，把差评风险转成详情页FAQ和售后承诺。`;
+  }
+
+  if (type === "compliance_ai") {
+    if (textIncludesAny(label, ["认证", "fcc", "etl", "ul", "prop", "cpsia"])) return "厨房电器上线前重点准备电气安全、食品接触材料、说明书警示和平台类目资质材料。";
+    if (textIncludesAny(label, ["违规", "风险"])) return "合规风险主要来自夸大碎冰效果、虚假健康功效、图片版权和电器安全声明。";
+    if (textIncludesAny(label, ["知识产权", "专利", "商标"])) return "需核查外观结构、刀头设计、品牌词和竞品图片版权，避免直接复制爆款素材。";
+    return `${context.product}属于厨房电器，合规重点是电器安全、食品接触、宣传边界和平台素材版权。`;
+  }
+
+  if (type === "launch_plan") {
+    if (textIncludesAny(label, ["week 1", "第一周"])) return "第1周完成Listing、FAQ、15条短视频素材和20位达人寄样，目标拿到首批内容反馈。";
+    if (textIncludesAny(label, ["week 2", "第二周"])) return "第2周放大点击率最高的3类场景，达人池扩到50-80位，并开始小预算广告测试。";
+    if (textIncludesAny(label, ["week 3", "第三周", "week 4", "第四周"])) return "第3-4周只放大ROAS达标内容，若退货和差评可控，再进入补货和直播加时。";
+    if (textIncludesAny(label, ["gmv"])) return `30天GMV目标建议从$30k-$80k起步；达到100万美元GMV需约${units}台销量。`;
+    return `${context.product}打品节奏应先测内容和售后，再放大达人、广告和库存。`;
+  }
+
+  if (type === "decision_center") {
+    if (textIncludesAny(label, ["立项", "建议"])) return `建议谨慎立项：${context.price}客单价和约${margin}裸毛利有测试空间，但必须先验证内容转化和退货率。`;
+    if (textIncludesAny(label, ["备货"])) return "首批备货建议控制在300-800台，等达人视频转化、退货率和广告ROAS达标后再补货。";
+    if (textIncludesAny(label, ["推荐", "指数"])) return "推荐指数应由内容传播、毛利空间和售后风险共同决定；当前优先做小批量测品。";
+    return `${context.product}决策结论是可测但不宜重仓，关键看TikTok内容转化、Amazon承接和售后稳定性。`;
+  }
+
+  if (type === "profit_model") {
+    if (textIncludesAny(label, ["出厂", "成本"])) return `出厂成本${context.cost}、目标售价${context.price}下，裸毛利率约${margin}，尾程和广告会决定最终利润。`;
+    if (textIncludesAny(label, ["关税"])) return "关税先按小家电常见税率区间估算，实际以HTS编码和清关资料为准。";
+    if (textIncludesAny(label, ["广告", "佣金"])) return "广告和平台佣金需要合计控制在售价的25%-35%以内，否则运营利润会被压缩。";
+    if (textIncludesAny(label, ["毛利", "利润"])) return `按${context.price}售价和${context.cost}成本，利润模型必须优先压低物流、广告和退货损耗。`;
+    return `${context.product}利润模型核心是售价${context.price}能否覆盖出厂、关税、海运、尾程、佣金、广告和售后损耗。`;
   }
 
   return `结论：${context.product}在${context.market}的${module.title}应优先围绕${label}制定动作；按${context.price}售价、${context.cost}成本和${context.platforms}渠道测算，该字段会直接影响内容转化、利润或投放节奏。`;
