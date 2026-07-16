@@ -234,24 +234,79 @@ function fallbackVariant(items, index) {
   return items[index % items.length];
 }
 
+function productArchetype(context) {
+  const text = `${context.product} ${context.category} ${context.scenarios} ${context.consumers}`.toLowerCase();
+
+  if (/剃|刮毛|脱毛|美容|美妆|个护|groom|beauty|razor|shaver|hair removal/.test(text)) {
+    return {
+      categoryRole: "美妆个护产品",
+      demandDrivers: "礼赠、日常护理、便携出行和精致生活",
+      visualHook: "使用前后对比、细节质感、便携收纳和真实上手效果",
+      creatorTypes: "美妆个护、精致生活、旅行收纳、礼物推荐和女性成长类达人",
+      searchTerms: "women razor / travel grooming / personal care / beauty gift",
+      painPoints: "刀头耐用度、皮肤刺激、清洁便利、替换耗材和材质安全",
+      complianceFocus: "材质宣传、皮肤刺激表述、功效边界、商标专利和图片版权",
+      seasonality: "礼品季、旅行季和夏季露肤场景"
+    };
+  }
+
+  if (/宠物|dog|cat|pet/.test(text)) {
+    return {
+      categoryRole: "宠物用品",
+      demandDrivers: "宠物健康、清洁护理、训练互动和主人省心",
+      visualHook: "宠物使用反应、前后对比、清洁效果和主人省力场景",
+      creatorTypes: "宠物生活、训宠、家居清洁和萌宠剧情类达人",
+      searchTerms: "pet care / dog grooming / cat supplies / pet cleaning",
+      painPoints: "适配宠物体型、耐用度、清洁难度、安全材质和售后更换",
+      complianceFocus: "宠物安全、材质说明、夸大健康功效、图片视频版权",
+      seasonality: "换毛季、节日礼品和家庭清洁高峰"
+    };
+  }
+
+  if (/厨房|家电|冰|饮品|搅拌|破壁|kitchen|ice|smoothie|blender/.test(text)) {
+    return {
+      categoryRole: "厨房小家电",
+      demandDrivers: "家庭自制、效率提升、健康饮品和聚会场景",
+      visualHook: "使用过程、成品效果、速度对比和清洗便利性",
+      creatorTypes: "厨房小家电、家庭食谱、健康饮食和生活方式类达人",
+      searchTerms: "kitchen gadget / smoothie maker / home appliance",
+      painPoints: "噪音、清洗、耐用度、体积占地和售后维修",
+      complianceFocus: "电器安全、食品接触材料、说明书警示和平台类目资质",
+      seasonality: "夏季、节日聚会和家庭厨房更新周期"
+    };
+  }
+
+  return {
+    categoryRole: context.category,
+    demandDrivers: `${context.scenarios}和${context.consumers}的购买需求`,
+    visualHook: "使用前后对比、核心卖点演示、真实场景和用户反馈",
+    creatorTypes: `${context.category}垂类达人、目标人群生活方式达人、测评达人和礼物推荐达人`,
+    searchTerms: `${context.product} / ${context.category} / ${context.scenarios}`,
+    painPoints: "质量稳定性、价格接受度、使用门槛、售后体验和竞品替代",
+    complianceFocus: "平台类目规则、广告宣传边界、知识产权、材质/认证声明",
+    seasonality: "节日促销、平台大促和目标场景高峰期"
+  };
+}
+
 function directModuleConclusion(section, label, project, profile, index = 0) {
   const context = projectContext(project, profile);
   const type = section.id;
   const margin = marginText(context);
   const units = millionGmvUnits(context);
+  const archetype = productArchetype(context);
 
   if (type === "market_intelligence") {
-    if (textIncludesAny(label, ["tam", "总可用"])) return `${context.market}${context.category}覆盖家庭厨房、健康饮品和夏季消暑需求，适合作为大盘容量判断，不直接等同首年销量。`;
-    if (textIncludesAny(label, ["sam", "可服务"])) return `可服务市场应聚焦TikTok、Amazon和Walmart线上用户，优先计算愿意购买${context.price}厨房电器的人群。`;
+    if (textIncludesAny(label, ["tam", "总可用"])) return `${context.market}${archetype.categoryRole}的大盘需求来自${archetype.demandDrivers}，适合作为市场上限判断，不直接等同首年销量。`;
+    if (textIncludesAny(label, ["sam", "可服务"])) return `可服务市场应聚焦${context.platforms}线上用户，优先计算愿意购买${context.price}价格带的${context.consumers}。`;
     if (textIncludesAny(label, ["som", "可获得"])) return "首阶段可获得市场来自达人内容转化和Amazon搜索承接，建议先按小批量测品份额评估。";
-    if (textIncludesAny(label, ["amazon"])) return "Amazon更适合承接搜索型需求，重点看 ice crusher / smoothie maker / shaved ice machine 同价位Listing转化。";
-    if (textIncludesAny(label, ["tiktok"])) return "TikTok增量来自视觉演示内容，出冰效果、夏日饮品和健身代餐场景决定短期爆发。";
-    if (textIncludesAny(label, ["walmart"])) return "Walmart适合做价格和家庭厨房场景承接，但爆发性弱于TikTok，适合作为补充渠道。";
-    if (textIncludesAny(label, ["google", "trends", "趋势"])) return "搜索趋势应重点观察5-8月夏季饮品高峰，以及健康代餐、家庭聚会内容是否同步升温。";
-    if (textIncludesAny(label, ["季节"])) return `${context.product}旺季集中在春末到夏季，备货和达人排期应提前4-6周启动。`;
-    if (textIncludesAny(label, ["价格带", "价格"])) return `${context.price}属于中高客单，必须用更强功率、口感、耐用性和售后承诺支撑溢价。`;
-    if (textIncludesAny(label, ["品牌集中"])) return "若头部品牌评价数量高但内容表达弱，TikTok仍可通过场景演示切入。";
-    if (textIncludesAny(label, ["top100", "竞品"])) return "优先拆解同价位竞品的差评、出冰效果、噪音和清洗问题，用改进点做卖点。";
+    if (textIncludesAny(label, ["amazon"])) return `Amazon更适合承接搜索型需求，重点看 ${archetype.searchTerms} 同价位Listing转化。`;
+    if (textIncludesAny(label, ["tiktok"])) return `TikTok增量来自${archetype.visualHook}，短期爆发取决于视频完播率、互动率和达人转化。`;
+    if (textIncludesAny(label, ["walmart"])) return "Walmart适合做价格比较和家庭消费承接，但爆发性通常弱于TikTok，适合作为补充渠道。";
+    if (textIncludesAny(label, ["google", "trends", "趋势"])) return `搜索趋势应重点观察${archetype.seasonality}，并对比${context.category}关键词的近5年热度。`;
+    if (textIncludesAny(label, ["季节"])) return `${context.product}的备货和达人排期应围绕${archetype.seasonality}提前4-6周启动。`;
+    if (textIncludesAny(label, ["价格带", "价格"])) return `${context.price}价格需要由${archetype.visualHook}和售后承诺支撑，否则容易被低价竞品压制。`;
+    if (textIncludesAny(label, ["品牌集中"])) return "若头部品牌评价数量高但内容表达弱，TikTok仍可通过场景演示和达人测评切入。";
+    if (textIncludesAny(label, ["top100", "竞品"])) return `优先拆解同价位竞品的${archetype.painPoints}，用改进点做Listing和短视频卖点。`;
     if (textIncludesAny(label, ["店铺"])) return "若竞品以Amazon店铺为主，TikTok Shop可用达人内容降低新品冷启动成本。";
     if (textIncludesAny(label, ["利润率", "利润"])) return `出厂成本${context.cost}、售价${context.price}下裸毛利约${margin}，核心压力来自尾程、广告和退货。`;
     if (textIncludesAny(label, ["gmv"])) return `按${context.price}售价测算，100万美元GMV需要约${units}台销量，应拆成达人、直播和搜索三条渠道目标。`;
@@ -262,103 +317,103 @@ function directModuleConclusion(section, label, project, profile, index = 0) {
     return fallbackVariant([
       `${context.product}市场验证优先看同价位竞品销量、搜索词热度和TikTok视频完播率。`,
       `${context.product}渠道策略应区分TikTok内容种草、Amazon搜索承接和Walmart家庭消费补充。`,
-      `${context.product}测品成败取决于夏季场景内容能否覆盖${context.consumers}并压低退货率。`
+      `${context.product}测品成败取决于${archetype.visualHook}能否覆盖${context.consumers}并压低退货率。`
     ], index);
   }
 
   if (type === "creator_intelligence") {
     if (textIncludesAny(label, ["达人类型", "creator type"])) {
-      return "优先合作厨房小家电、健康饮品、家庭食谱和健身代餐类达人；用3秒出冰沙/奶昔演示做内容钩子，中腰部达人负责转化。";
+      return `优先合作${archetype.creatorTypes}；用${archetype.visualHook}做内容钩子，中腰部达人负责转化。`;
     }
 
     if (textIncludesAny(label, ["年龄"])) {
-      return "核心粉丝年龄预计集中在25-44岁：25-34岁关注健康饮品和健身代餐，35-44岁关注家庭自制和厨房效率。";
+      return `核心粉丝年龄应围绕${context.consumers}验证，先看25-44岁购买力人群是否贡献主要转化。`;
     }
 
     if (textIncludesAny(label, ["性别"])) {
-      return "女性粉丝占比预计更高，主打家庭厨房、夏日饮品和亲子场景；健身代餐内容可补充男性健身人群。";
+      return `粉丝性别应由${context.category}实际购买场景决定，内容要同时测试自用、送礼和家庭决策三类表达。`;
     }
 
     if (textIncludesAny(label, ["地区"])) {
-      return "优先覆盖加州、德州、佛州和纽约等高温、家庭聚会和健康饮品消费更强的州。";
+      return `地区优先级应结合${context.market}消费能力、物流覆盖和${archetype.seasonality}来排序。`;
     }
 
     if (textIncludesAny(label, ["兴趣", "标签"])) {
-      return "核心兴趣标签建议锁定 #smoothie、#healthy、#fitness、#recipes、#kitchengadgets。";
+      return `核心兴趣标签应围绕${context.category}、${context.scenarios}、${archetype.searchTerms}和目标人群生活方式设置。`;
     }
 
     if (textIncludesAny(label, ["爆款率"])) {
-      return "内容爆款率预计中高：透明杯出沙冰、奶昔口感对比和夏季降温场景具备强视觉反馈。";
+      return `内容爆款率取决于${archetype.visualHook}是否能在前3秒讲清楚差异化和购买理由。`;
     }
 
     if (textIncludesAny(label, ["佣金"])) {
       return "平均佣金建议设为15%-20%；中高客单价可支撑达人测评成本，但需控制样品和物流费用。";
     }
 
-    if (textIncludesAny(label, ["合作难度"])) return "合作难度预计中等：厨房和健康类达人可接受样品测评，但需要提供明确佣金、卖点素材和使用脚本。";
+    if (textIncludesAny(label, ["合作难度"])) return `合作难度预计中等：${archetype.creatorTypes}通常需要明确佣金、样品价值、卖点素材和使用脚本。`;
     if (textIncludesAny(label, ["百万", "GMV"])) return `按${context.price}售价测算，100万美元GMV约需售出${units}台；建议准备120-200位达人池分层测试。`;
     return fallbackVariant([
-      "达人策略以中腰部厨房、健康饮品和家庭生活达人为主，先测内容转化，再放大高ROI达人。",
+      `达人策略以${archetype.creatorTypes}为主，先测内容转化，再放大高ROI达人。`,
       "达人分层建议先用长尾达人验证脚本，再用腰部达人放大销量，头部达人只在转化稳定后合作。",
-      "达人内容必须展示真实制作过程，单纯口播不适合厨房电器类产品。"
+      `达人内容必须展示${archetype.visualHook}，单纯口播不适合作为主素材。`
     ], index);
   }
 
   if (type === "consumer_intelligence") {
-    if (textIncludesAny(label, ["年龄"])) return "核心用户为25-44岁家庭用户和健康生活人群，购买动机集中在自制饮品、效率和夏季消暑。";
+    if (textIncludesAny(label, ["年龄"])) return `核心用户年龄应围绕${context.consumers}验证，先看25-44岁购买力人群是否贡献主要转化。`;
     if (textIncludesAny(label, ["收入"])) return `${context.price}价位更适合家庭年收入$75k+用户，低价敏感人群转化阻力较高。`;
-    if (textIncludesAny(label, ["购买", "原因"])) return "购买理由是家庭自制冰沙/奶昔、健康代餐、聚会饮品和减少外购饮品成本。";
-    if (textIncludesAny(label, ["痛点"])) return "核心痛点是机器清洗麻烦、噪音、碎冰效果不稳定、体积占地和售后维修成本。";
+    if (textIncludesAny(label, ["购买", "原因"])) return `购买理由集中在${archetype.demandDrivers}，需要用内容验证自用、送礼和场景触发哪个转化最高。`;
+    if (textIncludesAny(label, ["痛点"])) return `核心痛点是${archetype.painPoints}，详情页和评论区必须提前解释。`;
     return fallbackVariant([
-      `${context.product}目标用户应锁定健康饮品爱好者、年轻家庭和重视厨房效率的人群。`,
-      `用户购买前会重点比较碎冰效果、清洗难度、噪音和${context.price}价格合理性。`,
-      "用户转化内容应分别覆盖健身代餐、儿童饮品和家庭聚会三类动机。"
+      `${context.product}目标用户应锁定${context.consumers}，不要套用其他品类画像。`,
+      `用户购买前会重点比较${archetype.painPoints}和${context.price}价格合理性。`,
+      `用户转化内容应分别覆盖${context.scenarios}中的高频使用场景。`
     ], index);
   }
 
   if (type === "video_ai") {
-    if (textIncludesAny(label, ["选题"])) return "爆款选题围绕“30秒做出店铺同款冰沙”“夏天不用出门买奶昔”“健身代餐一杯搞定”。";
-    if (textIncludesAny(label, ["脚本", "30", "45", "60"])) return "脚本结构：3秒展示冰块变沙冰，10秒对比外卖饮品成本，15秒展示清洗和口感，结尾引导下单。";
-    if (textIncludesAny(label, ["分镜", "镜头"])) return "分镜优先拍透明杯出冰、近景质地、儿童/健身/派对三场景切换，避免只拍机器静物。";
-    if (textIncludesAny(label, ["bgm", "字幕"])) return "BGM选择夏日、清爽、快节奏音乐；字幕突出“省钱、健康、30秒、家庭可用”。";
+    if (textIncludesAny(label, ["选题"])) return `爆款选题围绕${archetype.visualHook}、${archetype.demandDrivers}和“为什么现在需要它”展开。`;
+    if (textIncludesAny(label, ["脚本", "30", "45", "60"])) return `脚本结构：3秒展示${archetype.visualHook}，中段解释${archetype.painPoints}解决方案，结尾给出购买理由和CTA。`;
+    if (textIncludesAny(label, ["分镜", "镜头"])) return `分镜优先拍${archetype.visualHook}、真实使用场景、细节特写和用户反馈，避免只拍产品静物。`;
+    if (textIncludesAny(label, ["bgm", "字幕"])) return `字幕突出${context.category}核心卖点、${context.price}价格理由和${context.consumers}最关心的问题。`;
     return fallbackVariant([
-      `${context.product}短视频核心是强视觉变化和场景对比，第一屏必须出现冰块变沙冰的结果。`,
-      `${context.scenarios}要拆成多个可拍脚本，避免所有视频只展示机器外观。`,
+      `${context.product}短视频核心是${archetype.visualHook}，第一屏必须让用户知道差异化价值。`,
+      `${context.scenarios}要拆成多个可拍脚本，避免所有视频只展示产品外观。`,
       "内容测试先跑3秒钩子、成品质地和清洗便利三个变量。"
     ], index);
   }
 
   if (type === "live_ai") {
-    if (textIncludesAny(label, ["sop", "2小时"])) return "2小时直播按“开场出杯-场景演示-优惠解释-答疑-限时逼单”循环，每20分钟重复一次核心卖点。";
+    if (textIncludesAny(label, ["sop", "2小时"])) return `2小时直播按“开场展示卖点-场景演示-优惠解释-答疑-限时成交”循环，每20分钟重复一次${context.category}核心卖点。`;
     if (textIncludesAny(label, ["coupon", "优惠", "抽奖"])) return "优惠节奏建议每30分钟发Coupon，配合样品抽奖提升停留，但折扣不能压穿毛利。";
-    if (textIncludesAny(label, ["演示"])) return "直播必须现场演示冰块、牛奶、水果三类原料，证明碎冰速度、口感和清洗便利性。";
-    if (textIncludesAny(label, ["问题", "回答"])) return "高频问答聚焦能否碎冰、噪音多大、是否好清洗、保修多久、适合几人家庭。";
+    if (textIncludesAny(label, ["演示"])) return `直播必须现场演示${archetype.visualHook}，证明产品解决${archetype.painPoints}。`;
+    if (textIncludesAny(label, ["问题", "回答"])) return `高频问答聚焦${archetype.painPoints}、适用人群、售后政策和与竞品差异。`;
     return fallbackVariant([
       `${context.product}直播应以即时演示建立信任，用限时券和套餐推动${context.price}客单成交。`,
-      "直播间每轮必须重复碎冰效果、清洗方式、保修承诺和优惠截止时间。",
-      "直播转化重点不是讲参数，而是连续展示不同饮品成品。"
+      `直播间每轮必须重复${context.category}核心卖点、售后承诺和优惠截止时间。`,
+      `直播转化重点不是讲参数，而是连续展示${context.scenarios}里的真实使用结果。`
     ], index);
   }
 
   if (type === "comment_ai") {
-    if (textIncludesAny(label, ["喜欢", "好评"])) return "好评卖点应围绕出冰细腻、饮品口感、家庭聚会好用和减少外购饮品成本。";
-    if (textIncludesAny(label, ["退货", "差评"])) return "差评风险集中在噪音、清洗、碎冰不均匀、机器发热和售后响应慢。";
-    if (textIncludesAny(label, ["文案"])) return "营销文案应强调“比外卖饮品更省钱、比普通搅拌机更适合碎冰、夏季家庭高频使用”。";
+    if (textIncludesAny(label, ["喜欢", "好评"])) return `好评卖点应围绕${archetype.visualHook}、使用体验和${archetype.demandDrivers}。`;
+    if (textIncludesAny(label, ["退货", "差评"])) return `差评风险集中在${archetype.painPoints}和售后响应。`;
+    if (textIncludesAny(label, ["文案"])) return `营销文案应强调${context.product}如何解决${archetype.painPoints}，并给出清晰使用场景。`;
     return fallbackVariant([
       `${context.product}评论分析要把正向卖点转成视频脚本，把差评风险转成详情页FAQ和售后承诺。`,
-      "评论抓取应优先看噪音、清洗、耐用性和碎冰效果，这些会直接影响退货。",
+      `评论抓取应优先看${archetype.painPoints}，这些会直接影响退货。`,
       "差评中的使用门槛要转成说明书、直播答疑和售后话术。"
     ], index);
   }
 
   if (type === "compliance_ai") {
-    if (textIncludesAny(label, ["认证", "fcc", "etl", "ul", "prop", "cpsia"])) return "厨房电器上线前重点准备电气安全、食品接触材料、说明书警示和平台类目资质材料。";
-    if (textIncludesAny(label, ["违规", "风险"])) return "合规风险主要来自夸大碎冰效果、虚假健康功效、图片版权和电器安全声明。";
-    if (textIncludesAny(label, ["知识产权", "专利", "商标"])) return "需核查外观结构、刀头设计、品牌词和竞品图片版权，避免直接复制爆款素材。";
+    if (textIncludesAny(label, ["认证", "fcc", "etl", "ul", "prop", "cpsia"])) return `${context.category}上线前需按品类确认平台资质、材质/安全认证和包装说明要求。`;
+    if (textIncludesAny(label, ["违规", "风险"])) return `合规风险主要来自${archetype.complianceFocus}。`;
+    if (textIncludesAny(label, ["知识产权", "专利", "商标"])) return "需核查外观结构、功能设计、品牌词和竞品图片版权，避免直接复制爆款素材。";
     return fallbackVariant([
-      `${context.product}属于厨房电器，合规重点是电器安全、食品接触、宣传边界和平台素材版权。`,
-      "合规文案不能暗示医疗或减肥功效，健康代餐只能作为使用场景表达。",
-      "上线前必须核查插头、电压、说明书警示和平台厨房电器类目要求。"
+      `${context.product}的合规重点是${archetype.complianceFocus}。`,
+      "合规文案不能夸大功效，必须把卖点限定在可验证的使用体验内。",
+      `上线前必须核查${context.category}平台类目规则、素材版权和必要认证。`
     ], index);
   }
 
@@ -381,13 +436,13 @@ function directModuleConclusion(section, label, project, profile, index = 0) {
     return fallbackVariant([
       `${context.product}决策结论是可测但不宜重仓，关键看TikTok内容转化、Amazon承接和售后稳定性。`,
       "如果达人视频点击高但转化低，应优先优化价格、赠品和详情页，而不是扩大投流。",
-      "如果退货率超过预期，应暂停补货并优先处理噪音、清洗和碎冰效果问题。"
+      `如果退货率超过预期，应暂停补货并优先处理${archetype.painPoints}。`
     ], index);
   }
 
   if (type === "profit_model") {
     if (textIncludesAny(label, ["出厂", "成本"])) return `出厂成本${context.cost}、目标售价${context.price}下，裸毛利率约${margin}，尾程和广告会决定最终利润。`;
-    if (textIncludesAny(label, ["关税"])) return "关税先按小家电常见税率区间估算，实际以HTS编码和清关资料为准。";
+    if (textIncludesAny(label, ["关税"])) return `关税先按${context.category}对应HTS编码和美国进口税率估算，实际以清关资料为准。`;
     if (textIncludesAny(label, ["广告", "佣金"])) return "广告和平台佣金需要合计控制在售价的25%-35%以内，否则运营利润会被压缩。";
     if (textIncludesAny(label, ["毛利", "利润"])) return `按${context.price}售价和${context.cost}成本，利润模型必须优先压低物流、广告和退货损耗。`;
     return fallbackVariant([
