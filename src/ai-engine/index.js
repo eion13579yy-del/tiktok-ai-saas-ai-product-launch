@@ -512,6 +512,172 @@ function riskLevelFromScore(riskScore) {
   return "high";
 }
 
+function dataPointValue(project, group, field, fallback = null) {
+  const value = project.structuredInput?.[group]?.[field]?.value;
+  return value === undefined || value === null || value === "" ? fallback : value;
+}
+
+function structuredNumber(project, group, field, fallback = 0) {
+  const value = Number(dataPointValue(project, group, field, fallback));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function rateNumber(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return number > 1 ? number / 100 : number;
+}
+
+function keywordHits(text, keywords) {
+  const normalized = String(text || "").toLowerCase();
+  return keywords.reduce((count, keyword) => count + (normalized.includes(keyword.toLowerCase()) ? 1 : 0), 0);
+}
+
+function inputFingerprintOffset(project, profile) {
+  const fingerprint = [
+    project.productName,
+    project.category,
+    project.targetPrice,
+    project.costPrice,
+    project.targetMarket,
+    (project.platforms || []).join("|"),
+    (project.competitorLinks || []).join("|"),
+    profile.productCategory,
+    compactList(profile.useScenarios, ""),
+    compactList(profile.consumerSegments, "")
+  ].join("::");
+
+  let hash = 0;
+  for (const char of fingerprint) {
+    hash = (hash * 31 + char.charCodeAt(0)) % 997;
+  }
+
+  return (hash % 11) - 5;
+}
+
+function blendScore(aiValue, modelValue) {
+  const aiScore = clampScore(aiValue);
+
+  if (!aiScore) {
+    return clampScore(modelValue);
+  }
+
+  return clampScore(aiScore * 0.35 + modelValue * 0.65);
+}
+
+function calibrateAiScore(rawScore = {}, project, profile = {}) {
+  const price = Number(project.targetPrice || structuredNumber(project, "salesFees", "targetPrice", 0));
+  const cost = Number(project.costPrice || structuredNumber(project, "supplyChain", "factoryPrice", 0));
+  const marginRate = price > 0 && cost > 0 ? (price - cost) / price : 0;
+  const platforms = project.platforms || [];
+  const competitorCount = (project.competitorLinks || []).length;
+  const returnRate = rateNumber(structuredNumber(project, "salesFees", "returnRate", 0));
+  const leadTimeDays = structuredNumber(project, "supplyChain", "productionLeadTimeDays", 45);
+  const hasBattery = Boolean(dataPointValue(project, "supplyChain", "hasBattery", false));
+  const isLiquid = Boolean(dataPointValue(project, "supplyChain", "isLiquid", false));
+  const isChildrenProduct = Boolean(dataPointValue(project, "supplyChain", "isChildrenProduct", false));
+  const needsCertification = Boolean(dataPointValue(project, "supplyChain", "needsSpecialCertification", false));
+  const text = [
+    project.productName,
+    project.category,
+    profile.productCategory,
+    profile.priceBand,
+    profile.tiktokFit,
+    profile.amazonFit,
+    profile.returnRisk,
+    profile.afterSalesRisk,
+    profile.complianceRisk,
+    profile.logisticsRisk,
+    ...(profile.useScenarios || []),
+    ...(profile.consumerSegments || []),
+    ...(profile.contentViralityAttributes || []),
+    ...(profile.decisionFactors || [])
+  ].join(" ");
+  const visualHits = keywordHits(text, [
+    "before", "after", "demo", "visual", "gift", "portable", "ugc", "tiktok",
+    "对比", "演示", "前后", "颜值", "礼物", "便携", "场景", "展示", "达人", "内容"
+  ]);
+  const commodityHits = keywordHits(text, ["basic", "commodity", "低差异", "同质", "基础款", "标品", "替代"]);
+  const riskHits = keywordHits(text, ["high", "高", "认证", "合规", "售后", "退货", "易碎", "液体", "儿童", "电池", "危险"]);
+  const categoryDemandHits = keywordHits(text, ["beauty", "pet", "kitchen", "health", "home", "fitness", "gift", "美妆", "个护", "宠物", "厨房", "家居", "健康", "礼赠"]);
+  const priceScore = price > 0 && price <= 35 ? 82 : price <= 80 ? 76 : price <= 180 ? 68 : price <= 350 ? 60 : 52;
+  const marginScore = marginRate > 0 ? clampScore(45 + marginRate * 85 - returnRate * 70) : 42;
+  const demandModel = clampScore(
+    54 +
+      categoryDemandHits * 3 +
+      Math.min((profile.useScenarios || []).length, 5) * 3 +
+      Math.min((profile.consumerSegments || []).length, 5) * 2 +
+      Math.min(platforms.length, 3) * 3 +
+      (project.targetMarket ? 3 : 0) +
+      (price > 0 ? Math.max(-8, (75 - Math.abs(priceScore - 75)) / 4) : -5)
+  );
+  const competitionModel = clampScore(
+    58 +
+      Math.min(competitorCount, 5) * 3 +
+      Math.min((profile.decisionFactors || []).length, 5) * 2 -
+      commodityHits * 8 -
+      (competitorCount === 0 ? 8 : 0)
+  );
+  const viralityModel = clampScore(
+    48 +
+      visualHits * 5 +
+      (platforms.some((item) => String(item).toLowerCase().includes("tiktok")) ? 8 : 0) -
+      commodityHits * 7 -
+      (price > 200 ? 4 : 0)
+  );
+  const riskModel = clampScore(
+    82 -
+      riskHits * 4 -
+      (hasBattery ? 8 : 0) -
+      (isLiquid ? 7 : 0) -
+      (isChildrenProduct ? 10 : 0) -
+      (needsCertification ? 8 : 0) -
+      (returnRate > 0.08 ? 10 : 0) -
+      (leadTimeDays > 45 ? 6 : 0)
+  );
+  const calibrated = {
+    demandScore: blendScore(rawScore.demandScore, demandModel),
+    competitionScore: blendScore(rawScore.competitionScore, competitionModel),
+    viralityScore: blendScore(rawScore.viralityScore, viralityModel),
+    marginScore: blendScore(rawScore.marginScore, marginScore),
+    riskScore: blendScore(rawScore.riskScore, riskModel),
+    overallScore: 0
+  };
+  calibrated.overallScore = clampScore(
+    calibrated.demandScore * 0.24 +
+      calibrated.competitionScore * 0.16 +
+      calibrated.viralityScore * 0.22 +
+      calibrated.marginScore * 0.2 +
+      calibrated.riskScore * 0.18 +
+      inputFingerprintOffset(project, profile)
+  );
+
+  return calibrated;
+}
+
+function scoreInsightFromCalibratedScore(score, context, profile) {
+  const scenarios = compactList(profile.useScenarios, context.scenarios);
+  const consumers = compactList(profile.consumerSegments, context.consumers);
+
+  if (score >= 82) {
+    return `${context.product}爆款概率较高，核心依据是${context.category}在${scenarios}场景下具备内容展示空间，且${consumers}人群与${context.platforms}渠道匹配度较好。`;
+  }
+
+  if (score >= 68) {
+    return `${context.product}具备测试价值，但爆款概率受${context.price}价格带、竞品密度、内容钩子和售后风险共同影响，需要先用达人短视频验证转化。`;
+  }
+
+  if (score >= 55) {
+    return `${context.product}只能谨慎小测，当前爆款概率主要被利润空间、内容差异化或风险项压低，首批备货应保守。`;
+  }
+
+  return `${context.product}暂不建议重仓测试，当前输入显示内容传播、利润或风险结构不足以支撑稳定爆发。`;
+}
+
 function toLegacySection(section) {
   return {
     type: section.id,
@@ -535,7 +701,7 @@ function toLegacySection(section) {
 }
 
 function normalizeAiEngineReport(raw, project, config) {
-  const aiScore = {
+  const rawAiScore = {
     demandScore: clampScore(raw.aiScore?.demandScore),
     competitionScore: clampScore(raw.aiScore?.competitionScore),
     viralityScore: clampScore(raw.aiScore?.viralityScore),
@@ -545,9 +711,11 @@ function normalizeAiEngineReport(raw, project, config) {
   };
   const sections = raw.sections.map((section) => toLegacySection(enrichSection(section, project, raw.productProfile)));
   const context = projectContext(project, raw.productProfile);
+  const aiScore = calibrateAiScore(rawAiScore, project, raw.productProfile);
   const scoreInsight =
-    raw.scoreInsight ||
-    `${config.provider} AI Intelligence Engine 结合${context.product}的${context.category}属性、${context.scenarios}场景、${context.consumers}人群和${context.platforms}渠道完成评分推理，建议优先验证最高分机会和最低分风险。`;
+    isGenericReasoning(raw.scoreInsight)
+      ? scoreInsightFromCalibratedScore(aiScore.overallScore, context, raw.productProfile)
+      : `${raw.scoreInsight} 爆款概率已结合售价、成本、平台、竞品、内容属性和风险项二次校准。`;
 
   return {
     status: "completed",
@@ -649,6 +817,7 @@ Product Profile 必须分析：
 
 AI Score 必须包含：
 Demand Score, Competition Score, Virality Score, Margin Score, Risk Score, Overall Score。
+AI Score 禁止默认输出 70 或相同分数。每个分数必须根据当前产品名称、品类、目标售价、成本、平台、竞品链接、内容传播属性、物流风险、售后风险和合规风险独立判断；数据不足时应保守下调并在 scoreInsight 说明原因。
 `.trim();
 }
 
